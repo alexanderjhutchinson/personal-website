@@ -174,7 +174,9 @@ export function startLobby() {
       e.preventDefault();
       keys.add(e.code);
       lastInput = time;
-      auto = null;
+      // Taking control stops a run to the door. The walk in through a door always finishes,
+      // so a held key can't leave the character standing in the doorway it came through.
+      if (auto?.kind === "leave") auto = null;
       if (soundOn) sfx.setEnabled(true);
     }
   });
@@ -346,9 +348,11 @@ export function startLobby() {
     here = stateFor(reel);
     ({ world, dummy, scene } = here);
     const door = dir === 1 ? scene.exits.left : scene.exits.right;
+    const speed = Math.min(Math.abs(player.vx), tuning.runSpeed);
     if (door !== undefined) {
       player = new Player(dir === 1 ? -8 : WIDTH + 8, door * TILE);
       player.facing = dir;
+      player.vx = dir * speed; // keep walking at the speed it left at
       const x = dir === 1 ? 3 * TILE : WIDTH - 3 * TILE;
       auto = { kind: "enter", x, dir, elapsed: 0, stuck: 0, lastX: player.x };
     } else {
@@ -434,9 +438,9 @@ export function startLobby() {
     else input = time - lastInput > IDLE_BEFORE_WANDER ? player.wander(dt, world) : controls();
     player.update(dt, input, world, feel);
 
-    // Walking out through a door.
+    // Walking out through a door: past the edge and still heading out.
     if (auto?.kind !== "enter") {
-      const dir = player.x > WIDTH + 4 ? 1 : player.x < -4 ? -1 : 0;
+      const dir = player.x > WIDTH + 4 && player.vx > 0 ? 1 : player.x < -4 && player.vx < 0 ? -1 : 0;
       const target = dir ? neighbor(dir) : undefined;
       if (dir && target) {
         auto = null;
