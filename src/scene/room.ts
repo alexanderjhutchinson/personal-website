@@ -14,6 +14,8 @@ export interface Room {
     /** Lamp position in world space, used for the dust drifting around it. */
     position: THREE.Vector3;
   };
+  /** The pole lamp in the far corner. Dims with the main lamp. */
+  accent: { light: THREE.PointLight; glow: THREE.MeshStandardMaterial };
   fill: THREE.HemisphereLight;
   moon: THREE.DirectionalLight;
   windowGlass: THREE.MeshBasicMaterial;
@@ -365,6 +367,42 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
   lampLight.shadow.camera.near = 0.05;
   group.add(lampLight);
 
+  // Tension pole lamp in the far right corner, washing the wall with a little light.
+  const pole = new THREE.Group();
+  const chromeMat = new THREE.MeshStandardMaterial({ color: palette.chrome, metalness: 0.9, roughness: 0.25 });
+  const poleRod = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, ROOM.height, 12), chromeMat);
+  poleRod.position.y = ROOM.height / 2;
+  const poleFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.04, 16), chromeMat);
+  poleFoot.position.y = 0.02;
+  pole.add(poleRod, poleFoot);
+  const coneOuter = new THREE.MeshStandardMaterial({ color: palette.harvestGold, metalness: 0.4, roughness: 0.45 });
+  const coneGlow = new THREE.MeshStandardMaterial({
+    color: "#1a120b",
+    emissive: new THREE.Color(palette.lampLight),
+    emissiveIntensity: 1,
+    side: THREE.BackSide,
+  });
+  const cone = (y: number, tiltX: number, tiltZ: number) => {
+    const g = new THREE.Group();
+    const geo = new THREE.CylinderGeometry(0.055, 0.12, 0.22, 28, 1, true);
+    g.add(new THREE.Mesh(geo, coneOuter), new THREE.Mesh(geo, coneGlow));
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 8), chromeMat);
+    arm.rotation.z = Math.PI / 2;
+    arm.position.x = 0.07;
+    g.add(arm);
+    g.position.set(-0.13, y, 0);
+    g.rotation.set(tiltX, 0, tiltZ);
+    return g;
+  };
+  // One shade points up at the wall, one points down at the floor.
+  pole.add(cone(1.85, 0.5, 2.6), cone(1.25, -0.3, 0.5));
+  pole.position.set(ROOM.halfWidth - 0.32, 0, ROOM.back + 0.3);
+  pole.rotation.y = -0.6;
+  group.add(shadowed(pole, true, true));
+  const accentLight = new THREE.PointLight(palette.lampLight, 3, 0, 2);
+  accentLight.position.set(ROOM.halfWidth - 0.5, 1.75, ROOM.back + 0.45);
+  group.add(accentLight);
+
   // Posters on the left wall.
   const posterMat = (t: THREE.Texture) => new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 });
   const frameBlack = new THREE.MeshStandardMaterial({ color: "#1a1410", roughness: 0.5 });
@@ -480,6 +518,7 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
       bulb,
       position: lampLight.position.clone(),
     },
+    accent: { light: accentLight, glow: coneGlow },
     fill,
     moon,
     windowGlass,

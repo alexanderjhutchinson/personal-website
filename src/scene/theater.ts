@@ -56,8 +56,7 @@ export class Theater {
 
   private opts: TheaterOptions;
   private canvas: HTMLCanvasElement;
-  renderer!: THREE.WebGLRenderer;
-  scene!: THREE.Scene;
+  private renderer!: THREE.WebGLRenderer;
   private camera!: THREE.PerspectiveCamera;
   private composer!: EffectComposer;
   private bloom!: UnrealBloomPass;
@@ -123,7 +122,6 @@ export class Theater {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#050302");
-    this.scene = scene;
     this.camera = new THREE.PerspectiveCamera(46, 1, 0.03, 30);
 
     this.film = new Film();
@@ -445,6 +443,8 @@ export class Theater {
     lamp.light.intensity = 12 * s.lamp;
     lamp.shade.emissiveIntensity = 0.02 + 0.95 * s.lamp;
     lamp.bulb.color.set(palette.lampLight).multiplyScalar(0.2 + 2.8 * s.lamp);
+    this.room.accent.light.intensity = 3 * s.lamp;
+    this.room.accent.glow.emissiveIntensity = 0.04 + 0.7 * s.lamp;
     this.room.fill.intensity = 0.15 + 0.75 * s.lamp;
     // Reduced motion freezes the drifting dust and smoke in place.
     const drift = this.opts.reducedMotion ? 0 : this.time;
