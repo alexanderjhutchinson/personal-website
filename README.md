@@ -22,7 +22,7 @@ Then open http://localhost:4321.
 |---|---|
 | `src/data/resume.ts` | All resume content: roles, about, links. Edit this to change the text. |
 | `src/pages/index.astro` | The one page: the 3D stage plus the resume. |
-| `src/components/Stage.astro` | Canvas and the buttons over the room (start, sound, skip, credits). |
+| `src/components/Stage.astro` | Canvas and the buttons over the room (start, sound, skip). |
 | `src/components/Resume.astro` | The resume shown after the camera enters the screen. Also what shows without JavaScript or WebGL. |
 | `src/scene/theater.ts` | The 3D controller: renderer, camera framing, and the opening, skip, and ending sequences (GSAP timelines). |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, window, screen. |

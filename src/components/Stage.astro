@@ -1,7 +1,3 @@
----
-import { links, person } from "../data/resume";
----
-
 <div class="stage" id="stage">
   <canvas
     id="scene"
@@ -36,32 +32,6 @@ import { links, person } from "../data/resume";
   <p class="skip-hint">
     <span class="fine">Click or press any key to skip</span><span class="coarse">Tap to skip</span>
   </p>
-
-  <section id="credits" class="credits" aria-labelledby="credits-title" hidden>
-    <button id="credits-close" class="credits-close" type="button" aria-label="Close">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-        <path d="M6 6l12 12M18 6L6 18"></path>
-      </svg>
-    </button>
-    <p class="label">Thanks for watching</p>
-    <h2 id="credits-title">{person.name}</h2>
-    <ul>
-      {
-        links.map((link) => (
-          <li>
-            <span class="label">{link.label}</span>
-            <a href={link.href} target={link.href.startsWith("http") ? "_blank" : undefined} rel="noopener">
-              {link.display}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
-    <div class="credit-actions">
-      <button id="play-again" class="reel-button primary" type="button">Play it again</button>
-      <button id="credits-resume" class="reel-button" type="button">Read the resume</button>
-    </div>
-  </section>
 </div>
 
 <style>
@@ -209,7 +179,6 @@ import { links, person } from "../data/resume";
     }
   }
 
-  :global(html[data-credits]) .prompt,
   :global(html:not([data-mode="room"])) .prompt,
   :global(html[data-loading]) .prompt,
   :global(html[data-loading]) .top-bar {
@@ -243,94 +212,5 @@ import { links, person } from "../data/resume";
   :global(html[data-mode="ending"]) .top-bar .skip {
     opacity: 0;
     pointer-events: none;
-  }
-
-  .credits {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: min(26rem, calc(100% - 32px));
-    padding: 2rem 1.75rem;
-    background: rgba(15, 11, 8, 0.9);
-    border: 2px solid var(--ink);
-    outline: 1px solid var(--ink-dim);
-    outline-offset: -9px;
-    text-align: center;
-    animation: credits-in 0.6s ease both;
-  }
-
-  .credits[hidden] {
-    display: none;
-  }
-
-  @keyframes credits-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, calc(-50% + 12px));
-    }
-  }
-
-  .credits-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ink-dim);
-    cursor: pointer;
-    transition: color 0.2s;
-  }
-
-  .credits-close:hover {
-    color: var(--amber);
-  }
-
-  .credits-close svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .credits h2 {
-    margin: 0.4rem 0 1.25rem;
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: var(--step-2);
-    line-height: 1.1;
-    text-wrap: balance;
-  }
-
-  .credits ul {
-    list-style: none;
-    margin: 0 0 1.5rem;
-    padding: 0;
-    display: grid;
-    gap: 0.6rem;
-  }
-
-  .credits li {
-    display: grid;
-    gap: 0.1rem;
-  }
-
-  .credits li .label {
-    color: var(--ink-faint);
-    font-size: 0.72rem;
-  }
-
-  .credits a {
-    overflow-wrap: anywhere;
-  }
-
-  .credit-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.6rem;
   }
 </style>

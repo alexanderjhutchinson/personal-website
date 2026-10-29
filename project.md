@@ -45,7 +45,7 @@ What's in it:
 - The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, a title card, then the camera moves into the screen and crossfades to the resume.
 - A short opening for return visits (about 1.8 seconds).
 - Skipping with any click or key.
-- The ending: "The End" card, film runout, the camera pulls back, lights come up, and a credits card shows contact links.
+- The ending: "The End" card, film runout, the camera pulls back, and the lights come up on the room.
 - Film look: grain, gate weave and flicker, heavy during transitions and faint on the resume.
 - Synthesized projector sound, off by default.
 - Phone framing, reduced-motion handling, and a fallback when WebGL is missing.
@@ -86,7 +86,7 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 
 ### Ending sequence (first draft)
 
-"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up to reveal contact info.
+"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up on the room. (A "Thanks for watching" card with contact links was tried and dropped; contact info lives on the resume.)
 
 ### The look
 

@@ -46,7 +46,7 @@ export interface TheaterOptions {
   reducedMotion: boolean;
   /** Return true when the visitor has already seen the full opening. */
   seenIntro: () => boolean;
-  onMode: (mode: Mode, detail: { afterEnding?: boolean }) => void;
+  onMode: (mode: Mode) => void;
   onHover: (hovering: boolean) => void;
 }
 
@@ -294,12 +294,12 @@ export class Theater {
     if (this.opts.reducedMotion) {
       Object.assign(s, { cam: 0, lamp: 1, beam: 0, screen: 0, running: 0, reels: 0, ...IDLE_LOOK });
       this.film.set("dark");
-      window.setTimeout(() => this.setMode("idle", { afterEnding: true }), 450);
+      window.setTimeout(() => this.setMode("idle"), 450);
       return;
     }
 
     this.sound.startMotor(0.3);
-    const tl = gsap.timeline({ onComplete: () => this.setMode("idle", { afterEnding: true }) });
+    const tl = gsap.timeline({ onComplete: () => this.setMode("idle") });
     this.tl = tl;
     tl.call(() => {
       this.film.set("runout");
@@ -335,9 +335,9 @@ export class Theater {
     });
   }
 
-  private setMode(mode: Mode, detail: { afterEnding?: boolean } = {}) {
+  private setMode(mode: Mode) {
     this.mode = mode;
-    this.opts.onMode(mode, detail);
+    this.opts.onMode(mode);
   }
 
   private setHovering(on: boolean) {
