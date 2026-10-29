@@ -53,10 +53,10 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   wood: { id: "wood", name: "Wood", lines: ["Place it anywhere"], use: "place", places: Tile.Planks, damage: 1, stackable: true, color: "#ffffff" },
 };
 
-type Plot = (x: number, y: number, color: string) => void;
+export type Plot = (x: number, y: number, color: string) => void;
 
 /** Draw a 16x16 icon with a plotting callback; a dark outline is added around the shape automatically. */
-function icon(draw: (plot: Plot, line: (x0: number, y0: number, x1: number, y1: number, c: string) => void) => void) {
+export function icon(draw: (plot: Plot, line: (x0: number, y0: number, x1: number, y1: number, c: string) => void) => void) {
   const S = 16;
   const px = new Map<number, string>();
   const plot: Plot = (x, y, color) => {

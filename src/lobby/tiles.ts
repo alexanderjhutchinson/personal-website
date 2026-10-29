@@ -6,7 +6,7 @@ import { rng } from "../scene/random";
 export const Tile = { Air: 0, Dirt: 1, Grass: 2, Stone: 3, Planks: 4, Platform: 5, Bedrock: 6, Torch: 7 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 
-export const Wall = { None: 0, Dirt: 1, Planks: 2 } as const;
+export const Wall = { None: 0, Dirt: 1, Planks: 2, Stone: 3 } as const;
 export type WallId = (typeof Wall)[keyof typeof Wall];
 
 export type Material = "dirt" | "stone" | "wood";
@@ -113,6 +113,7 @@ function buildAtlas() {
   blocks.set(Tile.Bedrock, speckled("#2b2422", ["#3a312d", "#1f1917"], 5, 18));
 
   walls.set(Wall.Dirt, speckled("#43281a", ["#3a2216", "#4d2f1f"], 9, 10));
+  walls.set(Wall.Stone, speckled("#3a3634", ["#312d2b", "#45403d", "#2a2725"], 11, 12));
   walls.set(
     Wall.Planks,
     Array.from({ length: VARIANTS }, (_, v) => {

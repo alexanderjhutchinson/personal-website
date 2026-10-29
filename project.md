@@ -2,6 +2,15 @@
 
 A from-scratch rebuild of my personal site. It replaces the old React/Vite site in `ahutchin/ahutchin.github.io`.
 
+## Where things stand
+
+- **Phase 1 (the living room) is built** on `phase-1-landing`.
+- **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. On `phase-2-lobby`.
+- **Both branches are pushed** to `alexanderjhutchinson/personal-website`. `main` still has only this outline.
+  - `phase-2-lobby` contains everything, so one pull request from it brings `main` up to date.
+- **Nothing is deployed yet.**
+- **Next:** connect the room's opening to Reel 1, then the rest of "Phase 2: next up".
+
 ## Why it matters
 
 - A well-made personal site strengthens an application.
@@ -53,10 +62,8 @@ What's in it:
 Needs your review:
 
 - [ ] **Listen to the sound.** I confirmed it runs without errors but couldn't hear it.
-- [ ] **Content refresh.**
-  - RedIron's end date is missing.
-  - The About copy is from 2023.
-  - The Red Door role is left out, as on the 2024 site (it's in the appendix if you want it back).
+- [x] **Swapped in the June 2026 resume content** (see the appendix). The resume page is now "the program" and shows experience, projects, education and skills, with no bullets.
+- [ ] **The About copy is from 2023** and needs a rewrite.
 - [ ] **Placeholder posters.** "The Late Show" and "Double Feature" are original placeholders. Swap in your own picks.
 - [ ] **Reloading after the film opens the resume directly** (the URL becomes `/#resume`). Good for sharing a link, but returning visitors only see the room again via "End the film".
 - [ ] **Not yet tested:**
@@ -127,21 +134,60 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 - **The lobby feel:** the scenes work like a game lobby. Moving, mining blocks, swinging a sword at a dummy, and placing torches and blocks are all optional, and never lock content away.
 - **Everything is original,** art and code. No Terraria assets or code.
 - **Content is data.** Adding a job or project should be one file, and layouts should handle any number of them.
+- **Projects go in the feature,** as Reel 3, not on a film can.
+- **Content source for now:** the June 2026 resume (appendix), without bullets.
+- **How Phase 1 leads into Phase 2:** the opening ends on Reel 1 instead of the resume. The film cans on the coffee table become clickable and play their home movie. The current resume page becomes the "Program", the plain-text fast path for recruiters.
+- **Still open:** what item name color means (type, recency, or impact; the reels use type for now: school, work, project), and what the Hobbies and Photos home movies show.
 
-### Status: first lobby frame built (branch `phase-2-lobby`)
+### Status: three reels built (branch `phase-2-lobby`)
 
-Open `/lobby` with `npm run dev`. One scene (the home base) to check the feel before building the rest.
+Run `npm run dev` and open `/about`. The Terraria-style feel was left alone this round, as asked; the work went into the content and moving between reels.
 
-- Pixel scene at 384×216, scaled with crisp pixels. Sunset sky with a striped sun, hills, trees, a house, a target dummy, and a torch-lit cave underground.
-- Movement: run, variable-height jump (hold for higher), single blocks are stepped up automatically, drop through platforms with S, coyote time and jump buffering.
-- The character wanders on its own after 6 seconds without input, and WASD takes over instantly.
-- Hotbar: pickaxe, sword, torches. Mined blocks drop items that fly to the player and stack in the hotbar, and can be placed again.
-- Mining shows crack stages, and block damage heals if you stop. The sword hits the dummy, which wobbles, with damage numbers and occasional crits.
-- Soft tile lighting: sunlight from above, torches glow, and the underground fades to dark.
-- Synthesized sound effects, sharing the sound setting with the living room.
-- **Tuning panel:** press `` ` `` or "Tune the feel", available in dev or with `?tune` in the URL. Sliders for speed, acceleration, jump, gravity, swing times, pickaxe power, and reach. "Copy values" gives the numbers to paste into `DEFAULT_TUNING` in `src/lobby/config.ts`.
+The reels:
 
-Not done yet: content items in the scene, the other two reels, doors and the frame-roll transition, phone controls (on phones the character only wanders, and tapping uses the selected item), and connecting the lobby to the room's opening.
+| Reel | Address | Scene | Items |
+|---|---|---|---|
+| 1 · About | `/about` | The home base at sunset (the first lobby frame) | Degree, skills, contact |
+| 2 · Experience | `/experience` | A torch-lit mine with timber supports, a rail and a cart | One per job |
+| 3 · Projects | `/projects` | A workshop at night with a workbench, anvil and furnace | One per project, with the tech stack as "Materials" |
+
+Moving between reels:
+
+- Each scene has a doorway at the edge with a signpost. Walking out of it changes the reel.
+- Door buttons at the bottom corners ("Reel 2 · Experience →") run the character to that door. A second press cuts right away, and the film cuts anyway if the character is blocked or takes over 2.4 seconds.
+- The cut is a frame roll: the old frame slides off, the black frame line passes, the new frame settles, with a ratchet of clicks if sound is on. The reel name then shows like an intertitle, and the character walks in through the opposite door.
+- Each reel has its own address, and the browser back and forward buttons move between reels. `/lobby` redirects to `/about`.
+- Each reel keeps its world for the visit, so mined blocks stay mined. The hotbar carries over.
+- Reduced motion: no roll and no walk, just the cut.
+
+Content:
+
+- One file per job (`src/data/jobs/`) and per project (`src/data/projects/`). Profile, education and skills are in `src/data/profile.ts`. The reels and the program both read from these.
+- Each reel has a panel of its items. It sits over the frame's top right on wide screens and under the frame on narrow ones. Names use the pixel font, and details use the mono font, because the pixel font's digits are hard to read small.
+- Clicking an item opens its card (Escape, the Close button, or a click outside closes it). The card's address is shareable, like `/projects#speakeasy`.
+- Name colors follow the type (the leaning from "Still open"): blue for school, gold for work, green for projects.
+- Each item has its own pixel icon (turbine, briefcase, leaf, server, speech bubble, gamepad, diploma, toolbox, envelope).
+- "The program" link under every reel goes to the plain resume at `/#resume`, whose footer links to all three reels.
+
+Checked: reel switching both ways, door walk-outs (including from inside the house over the hills), back and forward, cards, the build, and layouts at desktop and phone width. The roll was checked frame by frame rather than watched at full speed, because the test browser pauses animation when its pane is hidden. Watch it once in a real browser.
+
+Not done yet:
+
+- The room's opening still ends on the program, not Reel 1, so the reels are only reachable from the program's links or by address.
+- The cards hold only what the resume has. They're the place for write-ups, links and screenshots later.
+- The tuning panel's values haven't been tuned. The first lobby frame's notes still apply: run `/about?tune` or press `` ` `` in dev.
+
+### Phase 2: next up
+
+In rough order:
+
+1. **Connect the room:** the opening ends on Reel 1 instead of the program, and "End the film" works from any reel (a door before Reel 1 or after Reel 3 could lead back to the room).
+2. **Phone controls:** tap a spot to walk there and tap a door to change reels. The door buttons already work by touch.
+3. **Write-ups on the cards:** a line in your own voice per item, links (GitHub, demos), and later screenshots.
+4. **Clickable film cans:** home movies for Photos (a slide projector) and Hobbies.
+5. **Tune the feel** in the tuning panel, then copy the values into `DEFAULT_TUNING`.
+6. **Scene polish:** more props, and a reason to use the tools on each reel (ore in the mine, crafting at the workbench).
+7. **Later:** the live data (time of day, weather, the radio) and extra lobby fun (critters, a boss).
 
 ### Earlier ideas
 
@@ -182,7 +228,7 @@ Not done yet: content items in the scene, the other two reels, doors and the fra
 
 ### How phase 1 and 2 connect
 
-Open. One idea: the projected film is the window into the pixel world, the same way the TV was going to be.
+Decided (see "Decided" above): the opening ends on Reel 1, and the film cans play home movies. Not wired up yet: the reels exist, but the opening still ends on the program.
 
 ---
 
@@ -210,11 +256,17 @@ Decided for phase 1:
 - **Self-hosted fonts** via Fontsource: Fraunces (display), Instrument Sans (body), IBM Plex Mono (labels).
 - **No image files.** Every texture is painted on a canvas at load time.
 
+Decided for phase 2:
+
+- **Our own small engine** in TypeScript and Canvas 2D, with no game framework. It covers the tile grid, lighting, physics, items, entities and the reels, and comes to about 18 KB gzipped with the content. The code lives in `src/lobby/`.
+- **One Astro page per reel** (`src/pages/[reel].astro`), so the panels and cards are plain HTML. The game switches reels in place with the History API.
+- **Pixel art drawn in code** for now (tiles, character, items). It can be swapped for hand-drawn sprites later.
+- **Pixelify Sans** for the lobby's interface text.
+
 Still open:
 
 - Hosting: Cloudflare (my pick) or Vercel, for the live-data server endpoints later. GitHub Pages works for phase 1 alone.
 - A custom domain.
-- A canvas game framework (Phaser or Kaplay) if phase 2 happens.
 
 ## Ruled out
 
@@ -223,14 +275,53 @@ Still open:
 
 ## To do
 
+- [ ] Merge into `main`: open a pull request from `phase-2-lobby`, which contains everything.
+- [ ] Pick hosting and deploy.
 - [ ] Archive the old repo (`ahutchin/ahutchin.github.io`) instead of deleting it, or tag its last state (`v2-2024`) before wiping. Keeps the history.
 - [ ] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain.
 
 ---
 
-## Appendix: content carried over from the old site
+## Appendix: current content (June 2026 resume)
 
-Copied from the old repo so it survives the archive. Needs a refresh before use.
+What the site should show for now. Titles, companies, locations and dates only; bullets are dropped on purpose.
+
+### Education
+
+University of Waterloo, BASc Systems Design Engineering, Dean's Honours, GPA 3.9, 2026
+
+### Experience
+
+- **Software Engineer Intern**, GE Vernova, Boston, USA, Jun 2025 – Aug 2025
+- **Software Developer Intern**, RedIron Technologies, London, Canada, Sep 2024 – Dec 2024
+- **Full Stack Developer Intern**, Tree of Life Canada, Mississauga, Canada, Jan 2024 – Apr 2024
+
+### Projects
+
+The tech stack becomes each project's crafting recipe.
+
+- **Self-Hosted Homelab**, Aug 2025 – present. Ubuntu, Docker Compose, nginx, restic, Tailscale, Prometheus, Grafana.
+- **SpeakEasy**, Sep 2025 – Apr 2026. Flutter, FastAPI, Celery, Redis, XGBoost, AssemblyAI.
+- **Game Automation**, Aug 2026 – Oct 2026. OCR, SQLite, Appium.
+
+### Skills
+
+- **Languages:** Java, Bash, Python, TypeScript, JavaScript, C#, C++, SQL, Dart, HTML and CSS
+- **Frameworks and libraries:** Angular, NgRx, ASP.NET Core, Blazor, Flutter
+- **Tools:** Git, Postman, ORDS, Oracle SQL Developer, MySQL, Redis, Jira, Confluence
+
+### Contact
+
+- LinkedIn: https://www.linkedin.com/in/alexanderjhutchinson/
+- GitHub: https://github.com/alexanderjhutchinson
+- Email: ahutchin2003@gmail.com
+- The phone number stays off the public site.
+
+---
+
+## Appendix: older content from the 2023 and 2024 sites
+
+Copied from the old repo so it survives the archive. Superseded by the June 2026 content above, but kept in case any of it comes back.
 
 ### Experience
 

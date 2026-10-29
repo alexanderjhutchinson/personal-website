@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { person } from "../data/resume";
+import { person } from "../data/profile";
 import { SCREEN } from "./layout";
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from "./textures";
 

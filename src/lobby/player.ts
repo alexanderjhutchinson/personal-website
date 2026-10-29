@@ -112,12 +112,6 @@ export class Player {
       this.aiWait = 1 + Math.random() * 3;
       return NONE;
     }
-    const dir = Math.sign(dx);
-    // Jump when the wall ahead is taller than a single step.
-    const aheadX = this.x + dir * (this.w / 2 + 3);
-    const feetRow = Math.floor((this.y - 1) / TILE);
-    const blocked1 = TILES[world.fg(Math.floor(aheadX / TILE), feetRow)].solid;
-    const blocked2 = TILES[world.fg(Math.floor(aheadX / TILE), feetRow - 1)].solid;
     // Give up on spots it can't reach.
     this.aiStuck = Math.abs(this.x - this.aiLastX) < 0.5 ? this.aiStuck + dt : 0;
     this.aiLastX = this.x;
@@ -126,6 +120,16 @@ export class Player {
       this.aiWait = 0.5;
       return NONE;
     }
+    return this.steer(this.aiTarget, world);
+  }
+
+  /** Controls that walk toward x, jumping when the wall ahead is taller than a single step. */
+  steer(targetX: number, world: World): Controls {
+    const dir = Math.sign(targetX - this.x);
+    const aheadX = this.x + dir * (this.w / 2 + 3);
+    const feetRow = Math.floor((this.y - 1) / TILE);
+    const blocked1 = TILES[world.fg(Math.floor(aheadX / TILE), feetRow)].solid;
+    const blocked2 = TILES[world.fg(Math.floor(aheadX / TILE), feetRow - 1)].solid;
     return { left: dir < 0, right: dir > 0, jump: blocked1 && blocked2 && this.onGround, down: false };
   }
 

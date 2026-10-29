@@ -1,83 +1,47 @@
-import { COLS, HEIGHT, ROWS, TILE, WIDTH, loadTuning } from "./config";
+import { COLS, HEIGHT, ROWS, TILE, WIDTH, loadTuning, type Tuning } from "./config";
+import { mountContent } from "./content";
+import { drawDecor } from "./decor";
 import { Drop, Dummy, Floater, Particle, burst } from "./entities";
 import { mountHotbar, mountTuning } from "./hud";
 import { Inventory } from "./inventory";
 import { ITEMS } from "./items";
 import { makeCanvas } from "./pixels";
 import { Player, type Controls } from "./player";
+import { SCENES, type ReelScene } from "./scenes";
 import { Sfx } from "./sfx";
 import { Tile, TILES, drawCracks, drawTile, drawWall } from "./tiles";
-import { World, type Tree } from "./world";
-import { rng } from "../scene/random";
+import { World } from "./world";
+import { REELS, type Reel } from "../data";
+import { person } from "../data/profile";
 
 const STEP = 1 / 120;
 const IDLE_BEFORE_WANDER = 6; // seconds without input before the character wanders on its own
 const SOUND_KEY = "movie-night:sound";
+const ROLL_TIME = 0.45; // seconds for the film to roll from one frame to the next
+const FRAME_LINE = 12; // the black bar between two frames during the roll, in pixels
+const SPRINT = 2.4; // how much faster the character runs when a door button sends it
+const GIVE_UP = 2.4; // seconds of walking toward a door before cutting anyway
 
-/** Sky, sunset, hills, and trees: painted once, since nothing in them moves. */
-function paintBackdrop(trees: Tree[]) {
-  const { c, ctx } = makeCanvas(WIDTH, HEIGHT);
-  const sky = ctx.createLinearGradient(0, 0, 0, 130);
-  sky.addColorStop(0, "#1d1f45");
-  sky.addColorStop(0.5, "#6b3f63");
-  sky.addColorStop(0.85, "#d0704a");
-  sky.addColorStop(1, "#e89a55");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  const r = rng(7);
-  for (let i = 0; i < 40; i++) {
-    ctx.fillStyle = `rgba(255, 240, 220, ${0.3 + r() * 0.6})`;
-    ctx.fillRect(Math.floor(r() * WIDTH), Math.floor(r() * 50), 1, 1);
-  }
-
-  // A striped setting sun, like the poster in the living room.
-  const [sx, sy, sr] = [298, 112, 26];
-  for (let y = -sr; y <= sr; y++) {
-    const half = Math.floor(Math.sqrt(sr * sr - y * y));
-    const row = sy + y;
-    const band = y > 4 && (y - 4) % 6 < Math.min(4, Math.floor((y - 4) / 5) + 1);
-    if (band) continue;
-    ctx.fillStyle = y < -8 ? "#f6d07a" : y < 6 ? "#f2b04a" : "#e0662a";
-    ctx.fillRect(sx - half, row, half * 2, 1);
-  }
-
-  const hills = (base: number, amp: number, freq: number, phase: number, color: string) => {
-    ctx.fillStyle = color;
-    for (let x = 0; x < WIDTH; x++) {
-      const h = base - Math.round(Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 2.7 + phase * 2) * amp * 0.35);
-      ctx.fillRect(x, h, 1, HEIGHT - h);
-    }
-  };
-  hills(118, 9, 0.018, 1.2, "#5a3554");
-  hills(130, 7, 0.026, 3.1, "#3b2440");
-
-  for (const tree of trees) {
-    const baseX = tree.x * TILE + 4;
-    const baseY = tree.ground * TILE;
-    const top = baseY - tree.height * TILE;
-    ctx.fillStyle = "#5a3418";
-    ctx.fillRect(baseX - 2, top + 6, 5, baseY - top - 6);
-    ctx.fillStyle = "#6a3f20";
-    ctx.fillRect(baseX - 2, top + 6, 2, baseY - top - 6);
-    ctx.fillRect(baseX - 4, baseY - 2, 9, 2);
-    const blob = (cx: number, cy: number, rad: number, color: string) => {
-      ctx.fillStyle = color;
-      for (let y = -rad; y <= rad; y++) {
-        const half = Math.round(Math.sqrt(rad * rad - y * y));
-        ctx.fillRect(cx - half, cy + y, half * 2 + 1, 1);
-      }
-    };
-    blob(baseX, top + 4, 11, "#2f5424");
-    blob(baseX - 6, top + 8, 7, "#2f5424");
-    blob(baseX + 7, top + 7, 7, "#2f5424");
-    blob(baseX - 1, top + 2, 8, "#3e6b2c");
-    blob(baseX + 3, top - 1, 5, "#4c7f2c");
-    ctx.fillStyle = "#5f9a3a";
-    for (let i = 0; i < 10; i++) ctx.fillRect(baseX - 6 + Math.floor(r() * 14), top - 4 + Math.floor(r() * 10), 1, 1);
-  }
-  return c;
+/** Each reel keeps its own world for the visit, so mined blocks stay mined. */
+interface ReelState {
+  reel: Reel;
+  scene: ReelScene;
+  world: World;
+  dummy: Dummy | null;
+  backdrop: HTMLCanvasElement;
 }
+
+/** The character walking on its own: out through a door after a door button, or in through one after a cut. */
+interface AutoWalk {
+  kind: "leave" | "enter";
+  x: number;
+  dir: 1 | -1;
+  elapsed: number;
+  stuck: number;
+  lastX: number;
+}
+
+const reelAt = (path: string) => REELS.find((r) => r.path === path.replace(/\/+$/, ""));
 
 function rectsOverlap(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -92,19 +56,41 @@ export function startLobby() {
   const tuningPanel = document.getElementById("tuning");
   const tuneButton = document.getElementById("tune-toggle");
   const soundButton = document.getElementById("lobby-sound");
-  if (!canvas || !frame || !hotbar || !tooltip || !label || !tuningPanel) return;
+  const stage = document.getElementById("stage");
+  const prevButton = document.getElementById("door-prev");
+  const nextButton = document.getElementById("door-next");
+  const titleCard = document.getElementById("reel-title");
+  if (!canvas || !frame || !stage || !hotbar || !tooltip || !label || !tuningPanel) return;
   const screen = canvas.getContext("2d");
   if (!screen) return;
 
   const tuning = loadTuning();
-  let world = new World();
-  let player = new Player(world.spawn.x, world.spawn.y);
-  let dummy = new Dummy(world.dummyAt.x, world.dummyAt.y);
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const content = mountContent();
+
+  const states = new Map<Reel["id"], ReelState>();
+  const stateFor = (reel: Reel) => {
+    let state = states.get(reel.id);
+    if (!state) {
+      const scene = SCENES[reel.id];
+      const dummy = scene.dummyAt ? new Dummy(scene.dummyAt.x, scene.dummyAt.y) : null;
+      state = { reel, scene, world: new World(scene), dummy, backdrop: scene.paintBackdrop() };
+      states.set(reel.id, state);
+    }
+    return state;
+  };
+
+  let here = stateFor(REELS.find((r) => r.id === stage.dataset.reel) ?? reelAt(location.pathname) ?? REELS[0]);
+  let { world, dummy, scene } = here;
+  let player = new Player(scene.spawn.x, scene.spawn.y);
   let drops: Drop[] = [];
   let particles: Particle[] = [];
   let floaters: Floater[] = [];
-  const backdrop = paintBackdrop(world.trees);
+  let auto: AutoWalk | null = null;
+  let transition: { t: number; dir: 1 | -1 } | null = null;
   const { c: buffer, ctx } = makeCanvas(WIDTH, HEIGHT);
+  const { c: fromFrame, ctx: fromCtx } = makeCanvas(WIDTH, HEIGHT);
+  const { c: rollFrame, ctx: rollCtx } = makeCanvas(WIDTH, HEIGHT);
 
   const inv = new Inventory();
   const stockInventory = () => {
@@ -118,9 +104,11 @@ export function startLobby() {
   stockInventory();
 
   const resetScene = () => {
-    world = new World();
-    player = new Player(world.spawn.x, world.spawn.y);
-    dummy = new Dummy(world.dummyAt.x, world.dummyAt.y);
+    states.delete(here.reel.id);
+    here = stateFor(here.reel);
+    ({ world, dummy, scene } = here);
+    player = new Player(scene.spawn.x, scene.spawn.y);
+    auto = null;
     drops = [];
     particles = [];
     floaters = [];
@@ -168,7 +156,10 @@ export function startLobby() {
   const GAME_KEYS = new Set(["KeyA", "KeyD", "KeyW", "KeyS", "Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 
   window.addEventListener("keydown", (e) => {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || content.isOpen()) return;
+    // Space and Enter press a button that has keyboard focus instead of jumping.
+    const focused = e.target instanceof HTMLElement && e.target.matches("button:focus-visible, a:focus-visible");
+    if (focused && (e.code === "Space" || e.code === "Enter")) return;
     if (e.code === "Backquote") {
       toggleTuning();
       return;
@@ -183,6 +174,7 @@ export function startLobby() {
       e.preventDefault();
       keys.add(e.code);
       lastInput = time;
+      auto = null;
       if (soundOn) sfx.setEnabled(true);
     }
   });
@@ -280,7 +272,7 @@ export function startLobby() {
       const isTorch = def.places === Tile.Torch;
       if (isTorch ? !world.torchSupported(tx, ty) : !world.blockSupported(tx, ty)) return;
       const cell = { x: tx * TILE, y: ty * TILE, w: TILE, h: TILE };
-      if (!isTorch && (rectsOverlap(cell, player.box) || rectsOverlap(cell, dummy.box))) return;
+      if (!isTorch && (rectsOverlap(cell, player.box) || (dummy && rectsOverlap(cell, dummy.box)))) return;
       world.set(tx, ty, def.places);
       inv.consume(inv.selected);
       sfx.place(TILES[def.places].material);
@@ -290,7 +282,7 @@ export function startLobby() {
 
   /** Swinging tools can hit the dummy once per swing, anywhere along the blade. */
   const checkSwingHit = () => {
-    if (!player.useItem || swingHit) return;
+    if (!player.useItem || swingHit || !dummy) return;
     const def = ITEMS[player.useItem];
     if (def.use === "place") return;
     const p = player.useProgress;
@@ -316,13 +308,146 @@ export function startLobby() {
     }
   };
 
+  // Reels.
+  const neighbor = (dir: 1 | -1): Reel | undefined => REELS[REELS.indexOf(here.reel) + dir];
+  const panels = document.querySelectorAll<HTMLElement>("[data-reel-panel]");
+
+  const renderReel = () => {
+    const { reel } = here;
+    document.title = `${reel.title} · ${person.name}`;
+    canvas.setAttribute("aria-label", `Reel ${reel.number}, ${reel.title}. ${scene.alt}`);
+    for (const panel of panels) panel.hidden = panel.dataset.reelPanel !== reel.id;
+    for (const [button, target] of [
+      [prevButton, neighbor(-1)],
+      [nextButton, neighbor(1)],
+    ] as const) {
+      if (!button) continue;
+      button.hidden = !target;
+      const text = button.querySelector("[data-label]");
+      if (text && target) text.textContent = `Reel ${target.number} · ${target.title}`;
+    }
+  };
+
+  const showTitle = () => {
+    if (!titleCard) return;
+    const number = titleCard.querySelector("[data-number]");
+    const name = titleCard.querySelector("[data-name]");
+    if (number) number.textContent = `Reel ${here.reel.number}`;
+    if (name) name.textContent = here.reel.title;
+    titleCard.classList.remove("show");
+    void titleCard.offsetWidth; // restart the animation
+    titleCard.classList.add("show");
+  };
+
+  /** Cut to another reel. The character comes in through the door on the side it left from. */
+  const go = (reel: Reel, dir: 1 | -1, push = true) => {
+    if (reel.id === here.reel.id) return;
+    fromCtx.drawImage(buffer, 0, 0);
+    here = stateFor(reel);
+    ({ world, dummy, scene } = here);
+    const door = dir === 1 ? scene.exits.left : scene.exits.right;
+    if (door !== undefined) {
+      player = new Player(dir === 1 ? -8 : WIDTH + 8, door * TILE);
+      player.facing = dir;
+      const x = dir === 1 ? 3 * TILE : WIDTH - 3 * TILE;
+      auto = { kind: "enter", x, dir, elapsed: 0, stuck: 0, lastX: player.x };
+    } else {
+      player = new Player(scene.spawn.x, scene.spawn.y);
+      auto = null;
+    }
+    drops = [];
+    particles = [];
+    floaters = [];
+    shake = 0;
+    lastInput = time;
+    if (push) history.pushState({ reel: reel.id }, "", reel.path);
+    renderReel();
+    sfx.roll();
+    if (reduceMotion.matches) {
+      transition = null;
+      showTitle();
+    } else {
+      transition = { t: 0, dir };
+    }
+  };
+
+  /** A door button: the character runs out through that side's door, then the film cuts. */
+  let sprint: Tuning = tuning;
+  const leave = (dir: 1 | -1) => {
+    const target = neighbor(dir);
+    if (!target) return;
+    const door = dir === 1 ? scene.exits.right : scene.exits.left;
+    // Pressing it again while the character is on its way cuts right away.
+    const again = auto?.kind === "leave" && auto.dir === dir;
+    if (reduceMotion.matches || door === undefined || again || transition) {
+      auto = null;
+      go(target, dir);
+      return;
+    }
+    sprint = { ...tuning, runSpeed: tuning.runSpeed * SPRINT, accel: tuning.accel * 2 };
+    auto = { kind: "leave", x: dir === 1 ? WIDTH + 16 : -16, dir, elapsed: 0, stuck: 0, lastX: player.x };
+    lastInput = time;
+  };
+  prevButton?.addEventListener("click", () => leave(-1));
+  nextButton?.addEventListener("click", () => leave(1));
+
+  window.addEventListener("popstate", () => {
+    const reel = reelAt(location.pathname);
+    if (!reel || reel.id === here.reel.id) return;
+    auto = null;
+    go(reel, REELS.indexOf(reel) > REELS.indexOf(here.reel) ? 1 : -1, false);
+  });
+
   const update = (dt: number) => {
+    if (transition) {
+      // The world holds still while the film rolls.
+      transition.t += dt;
+      if (transition.t >= ROLL_TIME) {
+        transition = null;
+        showTitle();
+      }
+      return;
+    }
     time += dt;
-    const idle = time - lastInput > IDLE_BEFORE_WANDER;
-    player.update(dt, idle ? player.wander(dt, world) : controls(), world, tuning);
+
+    let input: Controls;
+    let feel = tuning;
+    if (auto) {
+      auto.elapsed += dt;
+      auto.stuck = Math.abs(player.x - auto.lastX) < 0.3 ? auto.stuck + dt : 0;
+      auto.lastX = player.x;
+      if (auto.kind === "leave") {
+        // Blocked (say, by placed blocks) or taking too long: cut anyway.
+        if (auto.elapsed > GIVE_UP || auto.stuck > 0.5) {
+          const { dir } = auto;
+          auto = null;
+          const target = neighbor(dir);
+          if (target) go(target, dir);
+          return;
+        }
+        feel = sprint;
+      } else if (Math.abs(auto.x - player.x) < 4 || auto.elapsed > 1.5) {
+        auto = null;
+      }
+    }
+    if (auto) input = player.steer(auto.x, world);
+    else input = time - lastInput > IDLE_BEFORE_WANDER ? player.wander(dt, world) : controls();
+    player.update(dt, input, world, feel);
+
+    // Walking out through a door.
+    if (auto?.kind !== "enter") {
+      const dir = player.x > WIDTH + 4 ? 1 : player.x < -4 ? -1 : 0;
+      const target = dir ? neighbor(dir) : undefined;
+      if (dir && target) {
+        auto = null;
+        go(target, dir);
+        return;
+      }
+    }
+
     tryUse();
     checkSwingHit();
-    dummy.update(dt);
+    dummy?.update(dt);
     const pc = player.center;
     for (const d of drops) {
       d.update(dt, world, pc);
@@ -349,18 +474,22 @@ export function startLobby() {
   const render = () => {
     ctx.save();
     if (shake > 0) ctx.translate(Math.round((Math.random() - 0.5) * 2), Math.round((Math.random() - 0.5) * 2));
-    ctx.drawImage(backdrop, 0, 0);
+    ctx.drawImage(here.backdrop, 0, 0);
 
-    for (const cl of clouds) {
-      const x = Math.round(((cl.x + time * 2.5) % (WIDTH + 60)) - 30);
-      ctx.fillStyle = "#e9a07c";
-      ctx.fillRect(x, cl.y, cl.w, 3);
-      ctx.fillRect(x + 4, cl.y - 2, cl.w - 10, 2);
-      ctx.fillStyle = "#c97a6a";
-      ctx.fillRect(x + 2, cl.y + 3, cl.w - 4, 1);
+    if (scene.clouds) {
+      const [color, shade] = scene.clouds;
+      for (const cl of clouds) {
+        const x = Math.round(((cl.x + time * 2.5) % (WIDTH + 60)) - 30);
+        ctx.fillStyle = color;
+        ctx.fillRect(x, cl.y, cl.w, 3);
+        ctx.fillRect(x + 4, cl.y - 2, cl.w - 10, 2);
+        ctx.fillStyle = shade;
+        ctx.fillRect(x + 2, cl.y + 3, cl.w - 4, 1);
+      }
     }
 
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) drawWall(ctx, world.bg(x, y), x, y);
+    for (const d of scene.decor) drawDecor(ctx, d, time);
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         drawTile(ctx, world, x, y, time);
@@ -369,7 +498,7 @@ export function startLobby() {
       }
     }
 
-    dummy.draw(ctx);
+    dummy?.draw(ctx);
     for (const d of drops) d.draw(ctx, time);
     player.draw(ctx);
     for (const p of particles) p.draw(ctx);
@@ -379,21 +508,20 @@ export function startLobby() {
     ctx.drawImage(world.lightCanvas, 0, 0, WIDTH, HEIGHT);
     ctx.imageSmoothingEnabled = false;
 
-    // Warm glow around torches.
+    // Warm glow around torches and anything else that burns.
     ctx.globalCompositeOperation = "lighter";
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        if (world.fg(x, y) !== Tile.Torch) continue;
-        const cx = x * TILE + 4;
-        const cy = y * TILE + 2;
-        const flicker = 0.85 + Math.sin(time * 9 + x) * 0.08 + Math.sin(time * 23 + y) * 0.05;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * flicker);
-        g.addColorStop(0, "rgba(255, 170, 80, 0.28)");
-        g.addColorStop(1, "rgba(255, 120, 40, 0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(cx - 30, cy - 30, 60, 60);
-      }
-    }
+    const glow = (x: number, y: number) => {
+      const cx = x * TILE + 4;
+      const cy = y * TILE + 2;
+      const flicker = 0.85 + Math.sin(time * 9 + x) * 0.08 + Math.sin(time * 23 + y) * 0.05;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * flicker);
+      g.addColorStop(0, "rgba(255, 170, 80, 0.28)");
+      g.addColorStop(1, "rgba(255, 120, 40, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - 30, cy - 30, 60, 60);
+    };
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (world.fg(x, y) === Tile.Torch) glow(x, y);
+    for (const [x, y] of scene.glows) glow(x, y);
     ctx.globalCompositeOperation = "source-over";
 
     for (const f of floaters) f.draw(ctx);
@@ -411,7 +539,24 @@ export function startLobby() {
     ctx.restore();
 
     screen.imageSmoothingEnabled = false;
-    screen.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+    screen.drawImage(transition ? rollFilm(transition.t / ROLL_TIME, transition.dir) : buffer, 0, 0, canvas.width, canvas.height);
+  };
+
+  /**
+   * The frame roll: the old frame slides off, the black frame line passes
+   * through, and the new frame slides into place, like film slipping in the gate.
+   */
+  const rollFilm = (p: number, dir: 1 | -1) => {
+    const eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    const travel = HEIGHT + FRAME_LINE;
+    const o = Math.round(eased * travel) * dir;
+    rollCtx.fillStyle = "#000";
+    rollCtx.fillRect(0, 0, WIDTH, HEIGHT);
+    rollCtx.drawImage(fromFrame, 0, -o);
+    rollCtx.drawImage(buffer, 0, dir === 1 ? travel - o : -travel - o);
+    rollCtx.fillStyle = `rgba(255, 236, 200, ${Math.random() * 0.08})`;
+    rollCtx.fillRect(0, 0, WIDTH, HEIGHT);
+    return rollFrame;
   };
 
   // Scale the frame to fit, using whole-pixel multiples when there's room.
@@ -428,11 +573,13 @@ export function startLobby() {
     canvas.style.height = `${cssH}px`;
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
-    frame.style.setProperty("--px", `${s}px`);
-    frame.style.width = `${cssW}px`;
+    stage.style.setProperty("--px", `${s}px`);
+    stage.style.width = `${cssW}px`;
   };
   resize();
   window.addEventListener("resize", resize);
+  renderReel();
+  showTitle();
 
   if (import.meta.env.DEV) {
     // Handle for poking at the lobby from the browser console while developing.
@@ -446,6 +593,16 @@ export function startLobby() {
       get dummy() {
         return dummy;
       },
+      get reel() {
+        return here.reel.id;
+      },
+      get auto() {
+        return auto;
+      },
+      get transition() {
+        return transition;
+      },
+      leave,
       inv,
       tuning,
       mouse,

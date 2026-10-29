@@ -90,6 +90,14 @@ export class Sfx {
     this.tone(660, 1320, 0.06, 0.07, "square");
   }
 
+  /** The film slipping between frames: a quick run of clicks through the gate. */
+  roll() {
+    if (!this.ensure()) return;
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => this.burst({ type: "bandpass", freq: 2600, q: 3, gain: 0.22, decay: 0.03 }), i * 55);
+    }
+  }
+
   place(material: Material) {
     const freq = { dirt: 300, stone: 900, wood: 500 }[material];
     this.burst({ type: "bandpass", freq, q: 1.2, gain: 0.45, decay: 0.06 });
