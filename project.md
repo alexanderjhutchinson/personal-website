@@ -118,7 +118,34 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 
 ## Phase 2: the world and how info is communicated
 
-> 📌 **Pinned. Needs more ideation before any decisions.** Everything below is raw ideas captured so far, not a plan.
+### Decided
+
+- **Reels with a pixel world behind them.** The feature film is a few reels. Each reel is a single-screen pixel scene with the character in it, and the content is items in a hotbar and inventory.
+- **The feature has three reels:** Home/About, Experience, and Projects.
+- **Moving between reels:** walk through a door at the edge of the scene, or press the next/previous button, which makes the character walk to the door. The cut is a frame roll.
+- **Film cans are home movies:** the personal, nonessential stuff (photos, hobbies). Each can can use its own film format, like a slide projector for photos.
+- **The lobby feel:** the scenes work like a game lobby. Moving, mining blocks, swinging a sword at a dummy, and placing torches and blocks are all optional, and never lock content away.
+- **Everything is original,** art and code. No Terraria assets or code.
+- **Content is data.** Adding a job or project should be one file, and layouts should handle any number of them.
+
+### Status: first lobby frame built (branch `phase-2-lobby`)
+
+Open `/lobby` with `npm run dev`. One scene (the home base) to check the feel before building the rest.
+
+- Pixel scene at 384×216, scaled with crisp pixels. Sunset sky with a striped sun, hills, trees, a house, a target dummy, and a torch-lit cave underground.
+- Movement: run, variable-height jump (hold for higher), single blocks are stepped up automatically, drop through platforms with S, coyote time and jump buffering.
+- The character wanders on its own after 6 seconds without input, and WASD takes over instantly.
+- Hotbar: pickaxe, sword, torches. Mined blocks drop items that fly to the player and stack in the hotbar, and can be placed again.
+- Mining shows crack stages, and block damage heals if you stop. The sword hits the dummy, which wobbles, with damage numbers and occasional crits.
+- Soft tile lighting: sunlight from above, torches glow, and the underground fades to dark.
+- Synthesized sound effects, sharing the sound setting with the living room.
+- **Tuning panel:** press `` ` `` or "Tune the feel", available in dev or with `?tune` in the URL. Sliders for speed, acceleration, jump, gravity, swing times, pickaxe power, and reach. "Copy values" gives the numbers to paste into `DEFAULT_TUNING` in `src/lobby/config.ts`.
+
+Not done yet: content items in the scene, the other two reels, doors and the frame-roll transition, phone controls (on phones the character only wanders, and tapping uses the selected item), and connecting the lobby to the room's opening.
+
+### Earlier ideas
+
+> Raw ideas captured before the decisions above. Kept for reference.
 
 ### Terraria-inspired world
 
