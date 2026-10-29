@@ -38,6 +38,11 @@ import { links, person } from "../data/resume";
   </p>
 
   <section id="credits" class="credits" aria-labelledby="credits-title" hidden>
+    <button id="credits-close" class="credits-close" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+    </button>
     <p class="label">Thanks for watching</p>
     <h2 id="credits-title">{person.name}</h2>
     <ul>
@@ -264,6 +269,31 @@ import { links, person } from "../data/resume";
       opacity: 0;
       transform: translate(-50%, calc(-50% + 12px));
     }
+  }
+
+  .credits-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-dim);
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .credits-close:hover {
+    color: var(--amber);
+  }
+
+  .credits-close svg {
+    width: 20px;
+    height: 20px;
   }
 
   .credits h2 {

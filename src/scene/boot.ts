@@ -44,6 +44,7 @@ export function boot() {
   const endButtons = document.querySelectorAll<HTMLButtonElement>("[data-end-film]");
   const replayButton = $<HTMLButtonElement>("play-again");
   const creditsResume = $<HTMLButtonElement>("credits-resume");
+  const creditsClose = $<HTMLButtonElement>("credits-close");
   if (!canvas || !resume) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -131,14 +132,25 @@ export function boot() {
 
   const start = () => theater?.start();
 
+  const creditsOpen = () => !!credits && !credits.hidden;
+  const closeCredits = () => {
+    if (!credits) return;
+    credits.hidden = true;
+    delete root.dataset.credits;
+    startButton?.focus({ preventScroll: true });
+  };
+
   startButton?.addEventListener("click", start);
   replayButton?.addEventListener("click", start);
   creditsResume?.addEventListener("click", () => theater?.enterQuick());
+  creditsClose?.addEventListener("click", closeCredits);
 
   canvas.addEventListener("click", (e) => {
     if (!theater) return;
     if (theater.mode === "playing") theater.skip();
     else if (theater.mode === "idle" && theater.hitsProjector(e.clientX, e.clientY)) theater.start();
+    // Clicking the room around the credits card dismisses it.
+    else if (theater.mode === "idle" && creditsOpen()) closeCredits();
   });
 
   skipLink?.addEventListener("click", (e) => {
@@ -160,7 +172,9 @@ export function boot() {
     if (!theater) return;
     const target = e.target as HTMLElement | null;
     const onControl = !!target?.closest("button, a, input, textarea, select");
-    if (theater.mode === "playing" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    if (e.key === "Escape" && creditsOpen()) {
+      closeCredits();
+    } else if (theater.mode === "playing" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       theater.skip();
     } else if (theater.mode === "idle" && !onControl && (e.key === "Enter" || e.key === " ")) {
