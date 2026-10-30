@@ -1,5 +1,6 @@
 ---
-import { about, links, person, roles } from "../data/resume";
+import { REELS, formatRange, jobs, projects } from "../data";
+import { about, education, links, person, skills } from "../data/profile";
 ---
 
 <main id="resume" class="resume" tabindex="-1">
@@ -8,7 +9,7 @@ import { about, links, person, roles } from "../data/resume";
     <span class="corner tr" aria-hidden="true"></span>
     <span class="corner bl" aria-hidden="true"></span>
     <span class="corner br" aria-hidden="true"></span>
-    <p class="label">Reel one</p>
+    <p class="label">The program</p>
     <h1>{person.name}</h1>
     <p class="divider" aria-hidden="true"><span></span></p>
     <p class="standfirst">
@@ -34,26 +35,56 @@ import { about, links, person, roles } from "../data/resume";
     <h2 class="intertitle" id="experience-title">Experience</h2>
     <ol class="roles">
       {
-        roles.map((role) => (
+        jobs.map((job) => (
           <li class="role">
-            <p class="dates">
-              <time>{role.start}</time>
-              {role.end && (
-                <>
-                  <span aria-hidden="true"> – </span>
-                  <span class="visually-hidden"> to </span>
-                  <time>{role.end}</time>
-                </>
-              )}
-            </p>
+            <p class="dates">{formatRange(job.start, job.end)}</p>
             <div class="role-body">
-              <h3>{role.title}</h3>
-              <p class="company">{role.company}</p>
-              <ul>
-                {role.points.map((point) => (
-                  <li>{point}</li>
-                ))}
-              </ul>
+              <h3>{job.title}</h3>
+              <p class="company">
+                {job.company}, {job.location}
+              </p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section aria-labelledby="projects-title">
+    <h2 class="intertitle" id="projects-title">Projects</h2>
+    <ol class="roles">
+      {
+        projects.map((project) => (
+          <li class="role">
+            <p class="dates">{formatRange(project.start, project.end)}</p>
+            <div class="role-body">
+              <h3>{project.name}</h3>
+              <p class="company">{project.stack.join(", ")}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section aria-labelledby="education-title">
+    <h2 class="intertitle" id="education-title">Education and skills</h2>
+    <ol class="roles">
+      <li class="role">
+        <p class="dates">{education.year}</p>
+        <div class="role-body">
+          <h3>{education.degree}</h3>
+          <p class="company">
+            {education.school}. {education.honours}, GPA {education.gpa}
+          </p>
+        </div>
+      </li>
+      {
+        skills.map((group) => (
+          <li class="role">
+            <p class="dates wrap">{group.label}</p>
+            <div class="role-body">
+              <p class="company">{group.items.join(", ")}</p>
             </div>
           </li>
         ))
@@ -69,7 +100,18 @@ import { about, links, person, roles } from "../data/resume";
   </section>
 
   <footer class="reel-end">
-    <p class="next">Projects, hobbies, and photos are on the next reel.</p>
+    <p class="next">The feature, in {REELS.length} reels</p>
+    <ul class="reel-links">
+      {
+        REELS.map((reel) => (
+          <li>
+            <a href={reel.path}>
+              <span class="label">Reel {reel.number}</span> {reel.title}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
     <button class="reel-button" type="button" data-end-film>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
         <circle cx="12" cy="12" r="9"></circle>
@@ -275,6 +317,10 @@ import { about, links, person, roles } from "../data/resume";
     font-variant-numeric: tabular-nums;
   }
 
+  .dates.wrap {
+    white-space: normal;
+  }
+
   .role-body {
     min-width: 0;
   }
@@ -291,16 +337,24 @@ import { about, links, person, roles } from "../data/resume";
     color: var(--ink-dim);
   }
 
-  .role ul {
-    margin: 0;
-    padding-left: 1.1rem;
-    display: grid;
-    gap: 0.55rem;
-    color: var(--ink);
+  .company:last-child {
+    margin-bottom: 0;
   }
 
-  .role li::marker {
+  .reel-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.75rem;
+  }
+
+  .reel-links .label {
     color: var(--ink-faint);
+    font-size: 0.72rem;
+    margin-right: 0.3em;
   }
 
   .about {

@@ -1,0 +1,712 @@
+---
+import "@fontsource/pixelify-sans/500.css";
+import { ITEM_TYPES, REELS, reelItems, type ReelId } from "../data";
+import { person } from "../data/profile";
+import Base from "../layouts/Base.astro";
+
+export function getStaticPaths() {
+  return REELS.map((reel) => ({ params: { reel: reel.path.slice(1) }, props: { id: reel.id } }));
+}
+
+const { id } = Astro.props as { id: ReelId };
+const reel = REELS.find((r) => r.id === id)!;
+const prev = REELS[reel.number - 2];
+const next = REELS[reel.number];
+const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id}/${item.id}`, item })));
+---
+
+<Base title={`${reel.title} · ${person.name}`} description={`Reel ${reel.number} of the feature: ${reel.title}.`}>
+  <main class="lobby">
+    <div class="stage" id="stage" data-reel={reel.id}>
+      <div class="frame" id="frame">
+        <canvas id="lobby-canvas" aria-label={`Reel ${reel.number}, ${reel.title}.`}></canvas>
+        <div class="hud">
+          <ol class="hotbar" id="hotbar" aria-label="Hotbar"></ol>
+          <p class="item-label" id="item-label" aria-live="polite"></p>
+        </div>
+        <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+        <p class="reel-title" id="reel-title" aria-hidden="true">
+          <span data-number>Reel {reel.number}</span>
+          <span data-name>{reel.title}</span>
+        </p>
+        <button id="door-prev" class="door prev" type="button" hidden={!prev}>
+          <span aria-hidden="true">←</span>
+          <span data-label>{prev && `Reel ${prev.number} · ${prev.title}`}</span>
+        </button>
+        <button id="door-next" class="door next" type="button" hidden={!next}>
+          <span data-label>{next && `Reel ${next.number} · ${next.title}`}</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+
+      {
+        REELS.map((r) => (
+          <section class="reel-panel" data-reel-panel={r.id} hidden={r.id !== reel.id} aria-labelledby={`panel-${r.id}`}>
+            <h1 id={`panel-${r.id}`}>
+              <span class="panel-number">Reel {r.number}</span> {r.title}
+            </h1>
+            <ul class="entries">
+              {reelItems[r.id].map((item) => (
+                <li>
+                  <button class="entry" type="button" data-item={`${r.id}/${item.id}`} aria-haspopup="dialog">
+                    <span class="slot" data-icon={item.icon} />
+                    <span class="entry-text">
+                      <span class="entry-name" style={`color: ${ITEM_TYPES[item.type].color}`}>
+                        {item.name}
+                      </span>
+                      <span class="entry-sub">{item.sub}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      }
+    </div>
+
+    <noscript>
+      <p class="noscript">The reels need JavaScript. Everything on them is also in <a href="/#resume">the program</a>.</p>
+    </noscript>
+
+    <div class="below">
+      <p class="help">
+        <span><kbd>A</kbd><kbd>D</kbd> move</span>
+        <span><kbd>Space</kbd> jump</span>
+        <span><kbd>S</kbd> drop down</span>
+        <span>Click to use</span>
+        <span><kbd>1</kbd>–<kbd>0</kbd> or scroll to switch items</span>
+        <span>Walk out a door to change reels</span>
+      </p>
+      <div class="links">
+        <button id="lobby-sound" class="reel-button" type="button" aria-pressed="false"><span data-label>Sound off</span></button>
+        <button id="tune-toggle" class="reel-button" type="button" hidden>Tune the feel</button>
+        <a class="back" href="/#resume">The program</a>
+        <a class="back" href="/">Back to the room</a>
+      </div>
+    </div>
+
+    <aside class="tuning" id="tuning" aria-label="Tuning" hidden></aside>
+
+    <dialog id="item-card" class="item-card" aria-label="Item details">
+      <div class="card">
+        {
+          cards.map(({ key, item }) => (
+            <article data-card={key} hidden>
+              <header>
+                <span class="slot" data-icon={item.icon} />
+                <div>
+                  <h2 style={`color: ${ITEM_TYPES[item.type].color}`}>{item.name}</h2>
+                  <p class="card-type">{ITEM_TYPES[item.type].label}</p>
+                </div>
+              </header>
+              {item.lines.map((line) => (
+                <p>{line}</p>
+              ))}
+              {item.groups?.map((group) => (
+                <section>
+                  <h3>{group.label}</h3>
+                  <ul class="chips">
+                    {group.items.map((name) => (
+                      <li>{name}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+              {item.links && (
+                <ul class="card-links">
+                  {item.links.map((link) => (
+                    <li>
+                      <span class="card-link-label">{link.label}</span>
+                      <a href={link.href} target={link.href.startsWith("http") ? "_blank" : undefined} rel="noopener">
+                        {link.display}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))
+        }
+        <button class="reel-button close" type="button" data-close>Close</button>
+      </div>
+    </dialog>
+  </main>
+</Base>
+
+<script>
+  import { startLobby } from "../lobby/game";
+  startLobby();
+</script>
+
+<style>
+  .lobby {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: #0b0806;
+  }
+
+  /* Holds the frame and the reel panel. --px is one game pixel on screen, set by the game. */
+  .stage {
+    --px: 3px;
+    position: relative;
+    max-width: 100%;
+    container: stage / inline-size;
+  }
+
+  .frame {
+    position: relative;
+    box-shadow:
+      0 0 0 calc(var(--px) * 2) #000,
+      0 0 60px rgba(224, 163, 58, 0.12);
+  }
+
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .hud {
+    position: absolute;
+    top: calc(var(--px) * 4);
+    left: calc(var(--px) * 4);
+    pointer-events: none;
+  }
+
+  .hotbar {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: calc(var(--px) * 1);
+    pointer-events: auto;
+  }
+
+  .hotbar :global(.slot) {
+    position: relative;
+    width: calc(var(--px) * 20);
+    height: calc(var(--px) * 20);
+    padding: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(28, 24, 48, 0.72);
+    border: var(--px) solid rgba(120, 110, 170, 0.75);
+    border-radius: calc(var(--px) * 2);
+    cursor: pointer;
+  }
+
+  .hotbar :global(.slot.selected) {
+    background: rgba(70, 58, 30, 0.82);
+    border-color: #f2c14e;
+  }
+
+  .hotbar :global(.slot img) {
+    width: calc(var(--px) * 16);
+    height: calc(var(--px) * 16);
+    image-rendering: pixelated;
+  }
+
+  .hotbar :global(.slot .key),
+  .hotbar :global(.slot .count) {
+    position: absolute;
+    font-family: "Pixelify Sans", var(--font-mono);
+    font-size: max(10px, calc(var(--px) * 5));
+    line-height: 1;
+    color: #f4eedf;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  .hotbar :global(.slot .key) {
+    top: calc(var(--px) * 1);
+    left: calc(var(--px) * 2);
+    opacity: 0.7;
+  }
+
+  .hotbar :global(.slot .count) {
+    bottom: calc(var(--px) * 1);
+    right: calc(var(--px) * 2);
+  }
+
+  .item-label {
+    margin: calc(var(--px) * 2) 0 0;
+    font-family: "Pixelify Sans", var(--font-mono);
+    font-size: max(11px, calc(var(--px) * 6));
+    color: #f4eedf;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  .tooltip {
+    position: absolute;
+    z-index: 2;
+    min-width: 9rem;
+    padding: 0.5rem 0.7rem;
+    background: rgba(20, 16, 36, 0.92);
+    border: 1px solid rgba(120, 110, 170, 0.8);
+    border-radius: 4px;
+    font-family: "Pixelify Sans", var(--font-mono);
+    font-size: 0.95rem;
+    line-height: 1.3;
+    color: #e8e2f2;
+    pointer-events: none;
+  }
+
+  .tooltip[hidden] {
+    display: none;
+  }
+
+  .tooltip :global(p) {
+    margin: 0;
+  }
+
+  .tooltip :global(.tip-name) {
+    font-size: 1.05rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .below {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    width: min(100%, 1152px);
+  }
+
+  .help {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--ink-dim);
+  }
+
+  kbd {
+    display: inline-block;
+    min-width: 1.4em;
+    margin-right: 0.25em;
+    padding: 0 0.3em;
+    border: 1px solid var(--ink-faint);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-align: center;
+    color: var(--ink);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+
+  .back {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+
+  .tuning {
+    position: fixed;
+    top: 16px;
+    right: max(16px, env(safe-area-inset-right, 0px));
+    z-index: 20;
+    width: min(20rem, calc(100% - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding: 1rem;
+    background: rgba(15, 11, 8, 0.94);
+    border: 1px solid var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+
+  .tuning[hidden] {
+    display: none;
+  }
+
+  .tuning :global(h2) {
+    margin: 0 0 0.25rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.2rem;
+  }
+
+  .tuning :global(.hint) {
+    margin: 0 0 0.8rem;
+    color: var(--ink-faint);
+  }
+
+  .tuning :global(.tune-row) {
+    display: grid;
+    grid-template-columns: 1fr 3.5rem;
+    gap: 0.1rem 0.5rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .tuning :global(.tune-row span) {
+    grid-column: 1 / -1;
+    color: var(--ink-dim);
+  }
+
+  .tuning :global(.tune-row input) {
+    width: 100%;
+    accent-color: var(--amber);
+  }
+
+  .tuning :global(output) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tuning :global(.tune-actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.8rem;
+  }
+
+  .tuning :global(.tune-actions button) {
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--ink-faint);
+    border-radius: 2px;
+    background: none;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .tuning :global(.tune-actions button:hover) {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  /* The reel's name, shown like an intertitle at the start of each reel. */
+  .reel-title {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    place-content: center;
+    gap: calc(var(--px) * 2);
+    text-align: center;
+    font-family: "Pixelify Sans", var(--font-mono);
+    color: #f4eedf;
+    text-shadow: max(1px, var(--px)) max(1px, var(--px)) 0 #000;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .reel-title [data-number] {
+    font-size: max(12px, calc(var(--px) * 6));
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #f2c14e;
+  }
+
+  .reel-title [data-name] {
+    font-size: max(26px, calc(var(--px) * 18));
+    line-height: 1;
+  }
+
+  .reel-title:global(.show) {
+    animation: reel-title 2.2s ease both;
+  }
+
+  @keyframes reel-title {
+    0% {
+      opacity: 0;
+      transform: translateY(calc(var(--px) * 3));
+    }
+    14%,
+    70% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes reel-title-still {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    14%,
+    70% {
+      opacity: 1;
+    }
+  }
+
+  /* Door buttons: the character walks out that side, then the film cuts. */
+  .door {
+    position: absolute;
+    bottom: calc(var(--px) * 4);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: max(4px, calc(var(--px) * 2)) max(8px, calc(var(--px) * 4));
+    font-family: "Pixelify Sans", var(--font-mono);
+    font-size: max(12px, calc(var(--px) * 5.5));
+    line-height: 1.1;
+    color: #f4eedf;
+    background: rgba(20, 16, 36, 0.8);
+    border: max(1px, var(--px)) solid rgba(120, 110, 170, 0.8);
+    border-radius: calc(var(--px) * 2);
+    cursor: pointer;
+  }
+
+  .door:hover {
+    color: #f2c14e;
+    border-color: #f2c14e;
+  }
+
+  .door.prev {
+    left: calc(var(--px) * 4);
+  }
+
+  .door.next {
+    right: calc(var(--px) * 4);
+  }
+
+  .door[hidden] {
+    display: none;
+  }
+
+  /* The reel's content as items. Over the frame's top right when there's room, under it otherwise.
+     --u is the panel's pixel size: fixed under the frame, the game's pixel over it. */
+  .reel-panel {
+    --u: 2px;
+    margin-top: 1rem;
+    padding: 0.8rem;
+    background: rgba(20, 16, 36, 0.86);
+    border: 1px solid rgba(120, 110, 170, 0.8);
+    border-radius: 4px;
+    font-family: "Pixelify Sans", var(--font-mono);
+    color: #e8e2f2;
+  }
+
+  .reel-panel[hidden] {
+    display: none;
+  }
+
+  @container stage (min-width: 600px) {
+    .reel-panel {
+      --u: var(--px);
+      position: absolute;
+      top: calc(var(--u) * 4);
+      right: calc(var(--u) * 4);
+      width: calc(var(--u) * 132);
+      margin: 0;
+      padding: calc(var(--u) * 4);
+      border-width: var(--u);
+      border-radius: calc(var(--u) * 2);
+    }
+  }
+
+  .reel-panel h1 {
+    margin: 0 0 calc(var(--u) * 3);
+    font-size: max(14px, calc(var(--u) * 7));
+    font-weight: 500;
+    line-height: 1.1;
+  }
+
+  .panel-number {
+    margin-right: 0.3em;
+    font-size: 0.7em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #f2c14e;
+  }
+
+  .entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: calc(var(--u) * 1.5);
+  }
+
+  .entry {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: calc(var(--u) * 3);
+    width: 100%;
+    padding: calc(var(--u) * 1);
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: max(1px, var(--u)) solid transparent;
+    border-radius: calc(var(--u) * 2);
+    cursor: pointer;
+  }
+
+  .entry:hover,
+  .entry:focus-visible {
+    background: rgba(70, 58, 30, 0.45);
+    border-color: rgba(242, 193, 78, 0.75);
+  }
+
+  .slot {
+    width: calc(var(--u) * 20);
+    height: calc(var(--u) * 20);
+    display: grid;
+    place-items: center;
+    flex: none;
+    background: rgba(28, 24, 48, 0.72);
+    border: max(1px, var(--u)) solid rgba(120, 110, 170, 0.75);
+    border-radius: calc(var(--u) * 2);
+  }
+
+  .slot :global(img) {
+    width: calc(var(--u) * 16);
+    height: calc(var(--u) * 16);
+    image-rendering: pixelated;
+  }
+
+  .entry-name {
+    display: block;
+    font-size: max(13px, calc(var(--u) * 6));
+    line-height: 1.15;
+  }
+
+  /* Details use the mono face: the pixel font's digits blur together at small sizes. */
+  .entry-sub {
+    display: block;
+    margin-top: 0.15em;
+    font-family: var(--font-mono);
+    font-size: max(11px, calc(var(--u) * 4.2));
+    line-height: 1.3;
+    color: #b9b3cc;
+  }
+
+  .noscript {
+    margin: 0;
+    color: var(--ink-dim);
+  }
+
+  /* An item's card: the full tooltip, opened from the panel. */
+  .item-card {
+    width: min(30rem, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    padding: 0;
+    color: #e8e2f2;
+    background: none;
+    border: none;
+  }
+
+  .item-card::backdrop {
+    background: rgba(5, 3, 2, 0.6);
+  }
+
+  .card {
+    --u: 3px;
+    padding: 1.25rem 1.4rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.45;
+    background: rgba(20, 16, 36, 0.97);
+    border: 2px solid rgba(120, 110, 170, 0.9);
+    border-radius: 6px;
+  }
+
+  .card article[hidden] {
+    display: none;
+  }
+
+  .card header {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .card h2,
+  .card h3,
+  .card-type {
+    font-family: "Pixelify Sans", var(--font-mono);
+  }
+
+  .card h2 {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+
+  .card-type {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: #9c95b5;
+  }
+
+  .card p {
+    margin: 0 0 0.2rem;
+  }
+
+  .card h3 {
+    margin: 0.9rem 0 0.45rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #f2c14e;
+  }
+
+  .chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .chips li {
+    padding: 0.1rem 0.5rem;
+    font-size: 0.9rem;
+    background: rgba(28, 24, 48, 0.85);
+    border: 1px solid rgba(120, 110, 170, 0.7);
+    border-radius: 3px;
+  }
+
+  .card-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .card-link-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #9c95b5;
+  }
+
+  .card-links a {
+    overflow-wrap: anywhere;
+  }
+
+  .close {
+    margin-top: 1.2rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reel-title:global(.show) {
+      animation-name: reel-title-still;
+    }
+  }
+</style>
