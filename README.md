@@ -55,7 +55,7 @@ Then open http://localhost:4321.
 
 ## How it behaves
 
-- **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. Links printed on it work. Escape puts it down.
+- **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. On a tall screen like a phone, the inside comes one page at a time (inside left, inside right) so it's readable. Links printed on it work. Escape puts it down.
 - **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves into it, landing on the reel: Reel 1 (`/about`), or the one picked in the program. No title cards, and no preview of the reel.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.

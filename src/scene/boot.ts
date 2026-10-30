@@ -38,9 +38,6 @@ const pageMode: Record<Mode, PageMode> = {
   ending: "ending",
 };
 
-/** The held program's views, as the controls name them. */
-const VIEW_NAMES = ["Cover", "Inside", "Back"];
-
 export function boot() {
   const root = document.documentElement;
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -86,7 +83,7 @@ export function boot() {
             root.dataset.hover = target ?? "";
             updatePrompt();
           },
-          onProgramPage: (v) => renderView(v),
+          onProgramPage: (name, first, last) => renderView(name, first, last),
           onFrame: () => placePrompt(),
         });
         await t.init();
@@ -172,11 +169,11 @@ export function boot() {
     }
   };
 
-  const renderView = (v: number) => {
-    if (viewName) viewName.textContent = VIEW_NAMES[v];
-    turnButtons.forEach((b) => (b.disabled = Number(b.dataset.turn) < 0 ? v === 0 : v === VIEW_NAMES.length - 1));
+  const renderView = (name: string, first: boolean, last: boolean) => {
+    if (viewName) viewName.textContent = name;
+    turnButtons.forEach((b) => (b.disabled = Number(b.dataset.turn) < 0 ? first : last));
   };
-  renderView(0);
+  renderView("Cover", true, false);
 
   // The pick-up prompt: points at the program on the table until it's been picked up once, then only on hover.
   const updatePrompt = () => {

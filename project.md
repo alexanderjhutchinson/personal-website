@@ -134,6 +134,7 @@ The site had three parts that didn't feel like one thing: the room, the resume, 
 - **Picking it up** (click, tap, or E) lifts it off the table and holds it up to the camera while the room dims. It's readable right in the render, like a note in a horror game.
 - **Four pages to turn through** with the arrow keys, the on-screen buttons, or a click on either half: the cover (name and tonight's running order of reels), the inside spread (Experience and Education; Projects and Skills), and the back (Contact).
 - **No separate reading view.** A high-def HTML view (R) was tried and dropped: the paper in hand is the way to read it. The contact links printed on the back work when clicked.
+- **Phones:** a tall screen is too narrow for the inside spread, so the inside comes one page at a time (cover, inside left, inside right, back), each filling the width. The paper draws back a little while it opens or turns over, so the cover never swings into the camera.
 - **Escape puts it down.** It stands back up on the table.
 - **The running order on the cover is clickable:** pick a reel and the film starts and opens on that reel.
 - **The opening runs straight into Reel 1** (`/about`) instead of a resume page, and crossfades into it where the browser supports page transitions.

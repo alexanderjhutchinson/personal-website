@@ -40,8 +40,29 @@ export interface ProgramHit {
   side: -1 | 1;
 }
 
-/** The program's pages as they're held: the cover, the inside spread, the back. */
-export const PROGRAM_VIEWS = 3;
+/** One step through the held program: its fold, which side is up, and which inside page is centered. */
+interface ProgramView {
+  name: string;
+  open: number;
+  flip: number;
+  /** -1 centers the inside-left page, 1 the inside-right page, 0 the whole spread. */
+  focus: number;
+}
+
+/** Wide screens see the inside as a spread. */
+const WIDE_VIEWS: ProgramView[] = [
+  { name: "Cover", open: 0, flip: 0, focus: 0 },
+  { name: "Inside", open: 1, flip: 0, focus: 0 },
+  { name: "Back", open: 0, flip: 1, focus: 0 },
+];
+
+/** Tall screens (phones) are too narrow for the spread, so the inside comes one page at a time. */
+const TALL_VIEWS: ProgramView[] = [
+  { name: "Cover", open: 0, flip: 0, focus: 0 },
+  { name: "Inside left", open: 1, flip: 0, focus: -1 },
+  { name: "Inside right", open: 1, flip: 0, focus: 1 },
+  { name: "Back", open: 0, flip: 1, focus: 0 },
+];
 
 /** Everything the sequences animate. The render loop reads it every frame. */
 interface SceneState {
@@ -61,6 +82,8 @@ interface SceneState {
   open: number;
   /** 1 turns the closed program over to its back. */
   flip: number;
+  /** Which inside page is centered while it's open (see ProgramView). */
+  focus: number;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -69,6 +92,7 @@ const tableQuat = new THREE.Quaternion();
 const heldPos = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const up = new THREE.Vector3();
+const right = new THREE.Vector3();
 
 const IDLE_LOOK = { grain: 0.045, flicker: 0.0, weave: 0.0 };
 const FILM_LOOK = { grain: 0.1, flicker: 0.1, weave: 1.4 };
@@ -79,8 +103,8 @@ export interface TheaterOptions {
   seenIntro: () => boolean;
   onMode: (mode: Mode) => void;
   onHover: (target: HoverTarget) => void;
-  /** The held program turned to another view (0 cover, 1 inside, 2 back). */
-  onProgramPage: (view: number) => void;
+  /** The held program turned to another view; first and last say whether it can turn further. */
+  onProgramPage: (name: string, first: boolean, last: boolean) => void;
   /** Called after every rendered frame. */
   onFrame?: () => void;
 }
@@ -120,6 +144,7 @@ export class Theater {
     paper: 0,
     open: PROGRAM.open,
     flip: 0,
+    focus: 0,
   };
   private tl: gsap.core.Timeline | null = null;
   private paperTl: gsap.core.Timeline | null = null;
@@ -264,10 +289,9 @@ export class Theater {
   programHit(clientX: number, clientY: number): ProgramHit | null {
     const hit = this.raycast(clientX, clientY, this.program.meshes)[0];
     if (!hit) return null;
+    // The held paper is always centered, so the halves of the screen are the halves of the paper.
     const rect = this.canvas.getBoundingClientRect();
-    const center = this.program.group.position.clone().project(this.camera);
-    const centerX = rect.left + ((center.x + 1) / 2) * rect.width;
-    return { action: this.program.actionAt(hit), side: clientX < centerX ? -1 : 1 };
+    return { action: this.program.actionAt(hit), side: clientX < rect.left + rect.width / 2 ? -1 : 1 };
   }
 
   /** Where the top of the program is on screen while it stands on the table, for the pick-up prompt. */
@@ -290,17 +314,26 @@ export class Theater {
     return this.opts.reducedMotion ? 0.01 : seconds;
   }
 
+  private get views() {
+    return this.size.w / this.size.h < 0.9 ? TALL_VIEWS : WIDE_VIEWS;
+  }
+
+  private showView() {
+    const views = this.views;
+    this.opts.onProgramPage(views[this.view].name, this.view === 0, this.view === views.length - 1);
+  }
+
   /** Pick the program up off the table and hold it up to the camera, cover first. */
   pickUp() {
     if (this.mode !== "idle") return;
     this.setMode("program");
     this.setHovering(null);
     this.view = 0;
-    this.opts.onProgramPage(0);
+    this.showView();
     this.sound.rustle();
     this.paperTl?.kill();
     this.paperTl = gsap.timeline({ onComplete: () => (this.paperTl = null) });
-    this.paperTl.to(this.state, { paper: 1, open: 0, flip: 0, duration: this.quick(0.75), ease: "power2.inOut" });
+    this.paperTl.to(this.state, { paper: 1, open: 0, flip: 0, focus: 0, duration: this.quick(0.75), ease: "power2.inOut" });
   }
 
   /** Stand the program back on the table. Resolves once it's down. */
@@ -320,33 +353,35 @@ export class Theater {
         paper: 0,
         open: PROGRAM.open,
         flip: 0,
+        focus: 0,
         duration: this.quick(0.7),
         ease: "power2.inOut",
       });
     });
   }
 
-  /** Turn the held program: open it to the inside, or close it and turn it over to the back. */
+  /** Turn the held program: open it to the inside, slide between inside pages, or close it and turn it over. */
   turn(dir: -1 | 1) {
     if (this.mode !== "program" || this.paperTl) return;
-    const next = clamp(this.view + dir, 0, PROGRAM_VIEWS - 1);
+    const views = this.views;
+    const next = clamp(this.view + dir, 0, views.length - 1);
     if (next === this.view) return;
-    const from = this.view;
+    const from = views[this.view];
+    const to = views[next];
     this.view = next;
-    this.opts.onProgramPage(next);
+    this.showView();
     this.sound.rustle(0.8);
     const s = this.state;
     const tl = gsap.timeline({ onComplete: () => (this.paperTl = null) });
     this.paperTl = tl;
     const ease = "power2.inOut";
-    if (from === 0 && next === 1) tl.to(s, { open: 1, duration: this.quick(0.6), ease });
-    else if (from === 1 && next === 0) tl.to(s, { open: 0, duration: this.quick(0.55), ease });
-    else if (from === 1 && next === 2) {
-      tl.to(s, { open: 0, duration: this.quick(0.45), ease });
-      tl.to(s, { flip: 1, duration: this.quick(0.55), ease });
-    } else if (from === 2 && next === 1) {
-      tl.to(s, { flip: 0, duration: this.quick(0.55), ease });
-      tl.to(s, { open: 1, duration: this.quick(0.45), ease });
+    // Turning it over needs it closed first.
+    if (from.flip !== to.flip) {
+      if (from.open) tl.to(s, { open: 0, focus: 0, duration: this.quick(0.45), ease });
+      tl.to(s, { flip: to.flip, duration: this.quick(0.55), ease });
+      if (to.open) tl.to(s, { open: to.open, focus: to.focus, duration: this.quick(0.45), ease });
+    } else {
+      tl.to(s, { open: to.open, focus: to.focus, duration: this.quick(0.6), ease });
     }
   }
 
@@ -358,7 +393,7 @@ export class Theater {
     this.paperTl = null;
     this.sound.stopMotor(0.2);
     Object.assign(this.state, { lamp: 1, running: 0, reels: 0, beam: 0, screen: 0, cam: 0, ...IDLE_LOOK, fade: 0 });
-    Object.assign(this.state, { paper: 0, open: PROGRAM.open, flip: 0 });
+    Object.assign(this.state, { paper: 0, open: PROGRAM.open, flip: 0, focus: 0 });
     this.film.set("dark");
     this.setMode("idle");
     this.startLoop();
@@ -535,6 +570,7 @@ export class Theater {
   resize() {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
+    const before = this.views;
     this.size = { w, h };
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
@@ -544,6 +580,17 @@ export class Theater {
     this.camera.aspect = w / h;
     this.applyCamera();
     if (this.mode === "entered") this.composer.render();
+    // Turning a phone between tall and wide while holding the program: keep showing the same part of it.
+    const views = this.views;
+    if (views !== before && this.mode === "program") {
+      const current = before[this.view];
+      this.view = Math.max(0, views.findIndex((v) => v.open === current.open && v.flip === current.flip));
+      this.paperTl?.kill();
+      this.paperTl = null;
+      const { open, flip, focus } = views[this.view];
+      Object.assign(this.state, { open, flip, focus });
+      this.showView();
+    }
   }
 
   private startLoop() {
@@ -682,13 +729,25 @@ export class Theater {
       return;
     }
 
-    // Held close enough to fill most of the view: the closed program by its height, the open spread by its width.
+    // Held close enough to fill most of the view: one page by its height (or width, on a phone), the open
+    // spread by its width. With an inside page in focus, that page is what fills the view.
     const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
-    const fit = (w: number, h: number) => Math.max(h / (0.78 * 2 * tan), w / (0.9 * 2 * tan * cam.aspect));
-    const d = lerp(fit(PAPER.w, PAPER.h), fit(PAPER.w * 2, PAPER.h), clamp(s.open, 0, 1));
+    const across = cam.aspect < 0.9 ? 0.95 : 0.9;
+    const fit = (w: number, h: number) => Math.max(h / (0.78 * 2 * tan), w / (across * 2 * tan * cam.aspect));
+    const page = fit(PAPER.w, PAPER.h);
+    const open = clamp(s.open, 0, 1);
+    // Drawn back a little while the cover swings toward the camera or the sheet turns over, so neither
+    // comes at the viewer.
+    const swing = Math.sin(Math.PI * open) * PAPER.w * 0.8 + Math.sin(Math.PI * clamp(s.flip, 0, 1)) * PAPER.w * 0.5;
+    const d = lerp(page, lerp(fit(PAPER.w * 2, PAPER.h), page, Math.abs(s.focus)), open) + swing;
     forward.set(0, 0, -1).applyQuaternion(cam.quaternion);
     up.set(0, 1, 0).applyQuaternion(cam.quaternion);
-    heldPos.copy(cam.position).addScaledVector(forward, d).addScaledVector(up, 2 * d * tan * 0.04);
+    right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    heldPos
+      .copy(cam.position)
+      .addScaledVector(forward, d)
+      .addScaledVector(up, 2 * d * tan * 0.04)
+      .addScaledVector(right, -s.focus * (PAPER.w / 2) * open);
     // A little lift on the way up, so it's picked up rather than slid.
     group.position.lerpVectors(tablePos, heldPos, s.paper).addScaledVector(UP, Math.sin(Math.PI * s.paper) * 0.06);
     group.quaternion.slerpQuaternions(tableQuat, cam.quaternion, s.paper);
