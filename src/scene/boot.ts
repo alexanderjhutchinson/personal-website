@@ -189,7 +189,7 @@ export function boot() {
     }
     setReading(false);
     await theater.putDown();
-    theater.start(reel.id);
+    theater.start();
   };
 
   const follow = (action: RegionAction) => {

@@ -369,10 +369,13 @@ export class Theater {
     this.startLoop();
   }
 
-  /** Run the opening: full on a first visit, short after that. The screen ends on this reel's opening frame. */
-  start(reel: ReelId = "about") {
+  /**
+   * Run the opening: full on a first visit, short after that. After the countdown the
+   * screen goes back to bare projector light and the camera moves into it; what's
+   * playing stays a surprise until the reel loads.
+   */
+  start() {
     if (this.mode !== "idle") return;
-    this.film.show(paintReelStill(reel));
     if (this.opts.reducedMotion) {
       this.enterQuick();
       return;
@@ -405,7 +408,7 @@ export class Theater {
       tl.to(s, { ...FILM_LOOK, duration: 0.4 }, 0.35);
       tl.call(() => this.film.set("countdown"), [], 0.95);
       tl.call(() => this.sound.pop(), [], 0.95 + COUNT_STEP);
-      tl.call(() => this.film.set("reel"), [], 0.95 + COUNT_STEP * 3);
+      tl.call(() => this.film.set("leader"), [], 0.95 + COUNT_STEP * 3);
       tl.to(s, { cam: 1, duration: 1.25, ease: "power2.inOut" }, 2.95);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 1.0 }, 3.0);
       tl.call(() => this.beginCrossfade(), [], 3.8);
@@ -418,7 +421,6 @@ export class Theater {
       tl.call(() => this.film.set("leader"), [], 0.15);
       tl.to(s, { beam: 1, screen: 1, duration: 0.2 }, 0.15);
       tl.to(s, { ...FILM_LOOK, duration: 0.3 }, 0.15);
-      tl.call(() => this.film.set("reel"), [], 0.5);
       tl.to(s, { cam: 1, duration: 1.05, ease: "power2.inOut" }, 0.55);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 0.8 }, 0.6);
       tl.call(() => this.beginCrossfade(), [], 1.35);
@@ -439,7 +441,7 @@ export class Theater {
     if (this.mode !== "playing") return;
     this.tl?.kill();
     this.tl = null;
-    this.film.set("reel");
+    this.film.set("leader");
     gsap.to(this.state, { beam: 1, screen: 1, lamp: 0.035, running: 1, duration: 0.2 });
     this.beginCrossfade();
     window.setTimeout(() => this.finishEnter(), 450);

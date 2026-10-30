@@ -9,8 +9,8 @@ import type { ReelId } from "../data";
 
 /**
  * A reel's opening frame, the way it looks the moment the page loads: the
- * character at its spawn point, nothing mined yet. The living room's projector
- * shows it on the screen, so walking into the screen lands on the same picture.
+ * character at its spawn point, nothing mined yet. When the film ends, the
+ * living room's projector shows it on the screen before the film runs out.
  */
 export function paintReelStill(id: ReelId) {
   const scene = SCENES[id];

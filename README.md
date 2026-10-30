@@ -51,12 +51,12 @@ Then open http://localhost:4321.
 | `src/lobby/content.ts` | Pixel icons for content items, and the item card. |
 | `src/lobby/decor.ts` | Props: signs, workbench, anvil, furnace, chest, mine cart. |
 | `src/lobby/draw.ts` | Draws a reel's scene: sky, walls, props, blocks, and light. |
-| `src/lobby/still.ts` | A reel's opening frame as a picture, for the room's projector to show. |
+| `src/lobby/still.ts` | A reel's opening frame as a picture, for the room's projector to show as the film ends. |
 
 ## How it behaves
 
 - **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. R switches to the high-def view; Escape puts it down. On a phone it goes straight to the high-def view.
-- **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen shows the reel's pixel scene and the camera moves into it, landing on the live reel: Reel 1 (`/about`), or the one picked in the program. No title cards.
+- **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves into it, landing on the reel: Reel 1 (`/about`), or the one picked in the program. No title cards, and no preview of the reel.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.

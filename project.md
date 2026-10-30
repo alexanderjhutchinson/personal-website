@@ -51,7 +51,7 @@ What's in it:
 
 - The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, and film cans labeled Experience, Projects and Photos.
 - A Super 8 projector on the coffee table. Click it (or press Enter) to start the film. The on-screen "Start the film" button was dropped.
-- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, then the screen shows the reel's own pixel scene and the camera moves into it, landing on the same picture, live. No text cards: the reel is the reveal.
+- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, then the screen goes back to bare projector light and the camera moves into it. No text cards and no preview: the reel is a surprise until it loads.
 - A short opening for return visits (about 1.8 seconds).
 - Skipping with any click or key.
 - The ending: the screen shows the reel that was playing, the film runs out to flickering light, the camera pulls back, and the lights come up on the room. No "The End" card.
@@ -87,7 +87,7 @@ Needs your review:
 3. **Beam appears.** Light cuts from the projector to the screen through floating dust.
 4. **Screen flickers white.** Slight frame jitter and scratches.
 5. **Countdown.** A short 3, 2, 1 with the sweeping circle, about 2 seconds.
-6. **The reel on the screen.** The projector shows the first reel's pixel scene (or the reel picked in the program), and the view moves forward into it until the live reel takes over. Title cards (my name, then "Feature Presentation") were tried and dropped: big text that said nothing.
+6. **Into the light.** The screen goes back to bare projector light and the view moves forward into it, then the reel loads. Title cards (my name, then "Feature Presentation") were dropped as big text that said nothing, and showing the reel on the screen was dropped because it spoils the surprise.
 
 Target length is 3 to 4 seconds. The full version plays on a first visit only, and a click skips it at any point.
 
