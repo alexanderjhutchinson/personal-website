@@ -4,10 +4,9 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 
 ## Where things stand
 
-- **Phase 1 (the living room) is built** on `phase-1-landing`.
-- **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. On `phase-2-lobby`.
-- **Both branches are pushed** to `alexanderjhutchinson/personal-website`. `main` still has only this outline.
-  - `phase-2-lobby` contains everything, so one pull request from it brings `main` up to date.
+- **Phase 1 (the living room) is built** and merged into `main` (#1).
+- **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. Merged into `main` (#2).
+- **Everything is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Nothing is deployed yet.**
 - **Next:** connect the room's opening to Reel 1, then the rest of "Phase 2: next up".
 
@@ -43,7 +42,7 @@ How it got here: a terminal interface became a CRT TV that powers on, then a mov
 
 **Goal:** the room, the projector start sequence, and the move into the screen. This is the first impression, and it's what makes the site memorable.
 
-### Status: first version built (branch `phase-1-landing`)
+### Status: first version built (merged in #1)
 
 Decided: a 3D room drawn entirely in code, set in the 1970s, ending on a stopgap resume page. Run it with `npm run dev` (see README).
 
@@ -139,7 +138,7 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 - **How Phase 1 leads into Phase 2:** the opening ends on Reel 1 instead of the resume. The film cans on the coffee table become clickable and play their home movie. The current resume page becomes the "Program", the plain-text fast path for recruiters.
 - **Still open:** what item name color means (type, recency, or impact; the reels use type for now: school, work, project), and what the Hobbies and Photos home movies show.
 
-### Status: three reels built (branch `phase-2-lobby`)
+### Status: three reels built (merged in #2)
 
 Run `npm run dev` and open `/about`. The Terraria-style feel was left alone this round, as asked; the work went into the content and moving between reels.
 
@@ -275,7 +274,7 @@ Still open:
 
 ## To do
 
-- [ ] Merge into `main`: open a pull request from `phase-2-lobby`, which contains everything.
+- [x] Merge into `main` (#1 for Phase 1, #2 for Phase 2).
 - [ ] Pick hosting and deploy.
 - [ ] Archive the old repo (`ahutchin/ahutchin.github.io`) instead of deleting it, or tag its last state (`v2-2024`) before wiping. Keeps the history.
 - [ ] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain.
