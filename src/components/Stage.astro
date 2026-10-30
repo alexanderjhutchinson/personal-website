@@ -1,0 +1,216 @@
+<div class="stage" id="stage">
+  <canvas
+    id="scene"
+    role="img"
+    aria-label="A 1970s living room at night. A home movie projector sits on the coffee table, pointed at a pull-down screen."
+  ></canvas>
+
+  <p class="loading" aria-live="polite">Threading the film…</p>
+
+  <div class="top-bar">
+    <a id="skip-to-resume" class="skip" href="#resume">Skip to the resume</a>
+    <button id="sound-toggle" class="reel-button sound" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
+        <g class="waves"><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path></g>
+        <g class="mute"><path d="M16 9.5l5 5M21 9.5l-5 5"></path></g>
+      </svg>
+      <span data-label>Sound off</span>
+    </button>
+  </div>
+
+  <div class="prompt">
+    <button id="start-film" class="reel-button primary" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"></path></svg>
+      Start the film
+    </button>
+    <p class="hint">
+      <span class="fine">or click the projector</span><span class="coarse">or tap the projector</span>
+    </p>
+  </div>
+
+  <p class="skip-hint">
+    <span class="fine">Click or press any key to skip</span><span class="coarse">Tap to skip</span>
+  </p>
+</div>
+
+<style>
+  .stage {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: #050302;
+  }
+
+  :global(html[data-mode="room"]) .stage,
+  :global(html[data-mode="playing"]) .stage,
+  :global(html[data-mode="entering"]) .stage,
+  :global(html[data-mode="ending"]) .stage {
+    display: block;
+  }
+
+  :global(html[data-mode="entering"]) .stage {
+    animation: stage-out 0.5s ease forwards;
+    pointer-events: none;
+  }
+
+  :global(html[data-mode="ending"]) .stage {
+    animation: stage-in 0.45s ease both;
+  }
+
+  @keyframes stage-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes stage-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: manipulation;
+  }
+
+  .loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  :global(html[data-loading]) .loading {
+    opacity: 1;
+  }
+
+  .top-bar {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .skip {
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+
+  .sound .waves {
+    display: none;
+  }
+
+  .sound[aria-pressed="true"] .waves {
+    display: inline;
+  }
+
+  .sound[aria-pressed="true"] .mute {
+    display: none;
+  }
+
+  .prompt {
+    position: absolute;
+    left: 50%;
+    bottom: max(7vh, calc(env(safe-area-inset-bottom, 0px) + 24px));
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    transition: opacity 0.35s;
+  }
+
+  @media (min-width: 48rem) {
+    .prompt {
+      left: max(32px, env(safe-area-inset-left, 0px));
+      bottom: max(32px, env(safe-area-inset-bottom, 0px));
+      transform: none;
+      align-items: flex-start;
+    }
+  }
+
+  .hint,
+  .skip-hint {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    text-align: center;
+    transition: color 0.2s;
+  }
+
+  :global(html[data-hover="projector"]) .hint {
+    color: var(--amber);
+  }
+
+  .coarse {
+    display: none;
+  }
+
+  @media (hover: none) {
+    .fine {
+      display: none;
+    }
+    .coarse {
+      display: inline;
+    }
+  }
+
+  :global(html:not([data-mode="room"])) .prompt,
+  :global(html[data-loading]) .prompt,
+  :global(html[data-loading]) .top-bar {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .skip-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: max(4vh, calc(env(safe-area-inset-bottom, 0px) + 16px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  :global(html[data-mode="playing"]) .skip-hint {
+    animation: hint-in 0.6s ease 0.8s both;
+  }
+
+  @keyframes hint-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 0.8;
+    }
+  }
+
+  :global(html[data-mode="playing"]) .top-bar .skip,
+  :global(html[data-mode="ending"]) .top-bar .skip {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>

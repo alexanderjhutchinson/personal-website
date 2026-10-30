@@ -1,0 +1,19 @@
+---
+import Resume from "../components/Resume.astro";
+import Stage from "../components/Stage.astro";
+import { person } from "../data/resume";
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title={person.name}
+  description={`${person.name}: ${person.program} at the ${person.school}, and ${person.role.toLowerCase()}.`}
+>
+  <Stage />
+  <Resume />
+</Base>
+
+<script>
+  import { boot } from "../scene/boot";
+  boot();
+</script>

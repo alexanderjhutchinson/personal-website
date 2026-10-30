@@ -34,6 +34,38 @@ How it got here: a terminal interface became a CRT TV that powers on, then a mov
 
 **Goal:** the room, the projector start sequence, and the move into the screen. This is the first impression, and it's what makes the site memorable.
 
+### Status: first version built (branch `phase-1-landing`)
+
+Decided: a 3D room drawn entirely in code, set in the 1970s, ending on a stopgap resume page. Run it with `npm run dev` (see README).
+
+What's in it:
+
+- The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, and film cans labeled Experience, Projects and Photos.
+- A Super 8 projector on the coffee table. Click it or the "Start the film" button.
+- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, a title card, then the camera moves into the screen and crossfades to the resume.
+- A short opening for return visits (about 1.8 seconds).
+- Skipping with any click or key.
+- The ending: "The End" card, film runout, the camera pulls back, and the lights come up on the room.
+- Film look: grain, gate weave and flicker, heavy during transitions and faint on the resume.
+- Synthesized projector sound, off by default.
+- Phone framing, reduced-motion handling, and a fallback when WebGL is missing.
+
+Needs your review:
+
+- [ ] **Listen to the sound.** I confirmed it runs without errors but couldn't hear it.
+- [ ] **Content refresh.**
+  - RedIron's end date is missing.
+  - The About copy is from 2023.
+  - The Red Door role is left out, as on the 2024 site (it's in the appendix if you want it back).
+- [ ] **Placeholder posters.** "The Late Show" and "Double Feature" are original placeholders. Swap in your own picks.
+- [ ] **Reloading after the film opens the resume directly** (the URL becomes `/#resume`). Good for sharing a link, but returning visitors only see the room again via "End the film".
+- [ ] **Not yet tested:**
+  - real phones, Safari and Firefox (only Chromium was tested)
+  - the reduced-motion path, which I checked by reading the code but couldn't switch on in the test browser
+- [ ] **Page weight.** The 3D scene is about 300 KB gzipped. It loads after the page, so the resume text is never blocked, but the room takes a moment on slow connections.
+- [ ] **Not deployed.** Hosting needs your accounts.
+- [ ] **`npm audit` flags two advisories** in build tooling (`undici`, `fast-uri`). Neither ships to the browser. I pinned installs to versions at least two weeks old, and `npm audit fix` would pull newer ones.
+
 ### The scene
 
 - POV from the couch, looking at the screen across the room.
@@ -54,7 +86,7 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 
 ### Ending sequence (first draft)
 
-"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up to reveal contact info.
+"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up on the room. (A "Thanks for watching" card with contact links was tried and dropped; contact info lives on the resume.)
 
 ### The look
 
@@ -77,10 +109,10 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 
 ### Open questions
 
-- [ ] How is the room drawn? Pixel art (keeps the door open for phase 2's world), flat illustration, or a 3D scene (most cinematic camera move, most work, heaviest page)?
-- [ ] Which decade is the room? This sets the projector, furniture, and color palette.
-- [ ] How long can the opening run before it feels in the way?
-- [ ] What's on the screen at the end of phase 1, before phase 2 exists? Options: a title card with contact links, or a simple readable resume page as a stopgap so the site is useful once it ships.
+- [x] How is the room drawn? **3D scene**, built in code with three.js. Models made in Blender can replace pieces later.
+- [x] Which decade is the room? **The 1970s.**
+- [ ] How long can the opening run before it feels in the way? Currently about 4.2 seconds the first time and 1.8 after. Watch it a few times and decide.
+- [x] What's on the screen at the end of phase 1, before phase 2 exists? **A stopgap resume page**, styled as projected light with silent-film title cards.
 
 ---
 
@@ -142,12 +174,20 @@ Each of these has a natural home in the scene. They need a small server piece to
 
 ## Tech stack
 
-Deferred until the design is settled. Earlier leaning, for reference:
+Decided for phase 1:
 
-- Astro + TypeScript, with interactive pieces as components only where needed.
-- A canvas game framework (Phaser or Kaplay) if phase 2 happens.
-- Hosting on Vercel or Cloudflare for the server endpoints.
+- **Astro + TypeScript.** The site is static by default; the 3D scene loads only on the page that uses it.
+- **three.js** for the room, written directly (no React layer). Effects use three's post-processing: bloom, plus a custom film shader.
+- **GSAP** timelines for the opening, skip, and ending sequences.
+- **Web Audio** for sound, synthesized in code. No audio files.
+- **Self-hosted fonts** via Fontsource: Fraunces (display), Instrument Sans (body), IBM Plex Mono (labels).
+- **No image files.** Every texture is painted on a canvas at load time.
+
+Still open:
+
+- Hosting: Cloudflare (my pick) or Vercel, for the live-data server endpoints later. GitHub Pages works for phase 1 alone.
 - A custom domain.
+- A canvas game framework (Phaser or Kaplay) if phase 2 happens.
 
 ## Ruled out
 
