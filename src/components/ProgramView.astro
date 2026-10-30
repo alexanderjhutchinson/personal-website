@@ -1,0 +1,21 @@
+---
+import Program from "./Program.astro";
+
+// The program as a plain page, for when the 3D room can't run (no WebGL or no
+// JavaScript). With the room running it stays hidden: the program is the paper
+// on the coffee table.
+---
+
+<div class="program-view" id="program-view">
+  <Program />
+</div>
+
+<style>
+  .program-view {
+    padding: clamp(1.5rem, 5vh, 3rem) max(16px, env(safe-area-inset-right, 0px)) 4rem max(16px, env(safe-area-inset-left, 0px));
+  }
+
+  :global(html[data-mode]:not([data-mode="flat"])) .program-view {
+    display: none;
+  }
+</style>

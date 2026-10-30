@@ -52,6 +52,27 @@ export class ProjectorSound {
     return this.ctx;
   }
 
+  /** Paper being picked up, turned, or put down. */
+  rustle(strength = 1) {
+    const ctx = this.ensure();
+    if (!ctx || !this.master || !this.noise) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.setValueAtTime(2200, t);
+    band.frequency.linearRampToValueAtTime(4400, t + 0.2);
+    band.Q.value = 0.7;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(0.16 * strength, t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    src.connect(band).connect(gain).connect(this.master);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + 0.32);
+  }
+
   /** The power switch. */
   clunk() {
     const ctx = this.ensure();

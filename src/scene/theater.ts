@@ -5,11 +5,15 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
+import type { ReelId } from "../data";
+import { paintReelStill } from "../lobby/still";
 import { buildBeam, buildRoomDust, type Beam } from "./beam";
 import { COUNT_STEP, Film } from "./film";
 import { createFilmPass } from "./filmPass";
-import { COUCH, IMAGE, PROJECTOR, SCREEN } from "./layout";
+import { COUCH, IMAGE, PROGRAM, PROJECTOR, SCREEN } from "./layout";
 import { palette } from "./palette";
+import { buildProgram, PAPER, type ProgramPaper } from "./program";
+import type { RegionAction } from "./programPages";
 import { buildProjector, type Projector } from "./projector";
 import { clamp, lerp } from "./random";
 import { buildRoom, type Room } from "./room";
@@ -18,12 +22,47 @@ import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures
 
 /**
  * - idle: the room, lamp on, waiting for the projector to be started
+ * - program: the program is picked up and held in front of the camera
  * - playing: the start sequence is running
- * - entering: the camera has reached the screen and the page is crossfading to the resume
- * - entered: the resume is showing; the 3D scene is paused
+ * - entering: the camera has reached the screen and the page is fading out to the feature
+ * - entered: the camera is in the screen; the 3D scene is paused while the feature loads
  * - ending: the ending sequence is running
  */
-export type Mode = "idle" | "playing" | "entering" | "entered" | "ending";
+export type Mode = "idle" | "program" | "playing" | "entering" | "entered" | "ending";
+
+export type HoverTarget = "projector" | "program" | null;
+
+/** What a click lands on while the program is held up. */
+export interface ProgramHit {
+  /** A printed reel or link under the pointer. */
+  action: RegionAction | null;
+  /** Which half of the paper: -1 left, 1 right. */
+  side: -1 | 1;
+}
+
+/** One step through the held program: its fold, which side is up, and which inside page is centered. */
+interface ProgramView {
+  name: string;
+  open: number;
+  flip: number;
+  /** -1 centers the inside-left page, 1 the inside-right page, 0 the whole spread. */
+  focus: number;
+}
+
+/** Wide screens see the inside as a spread. */
+const WIDE_VIEWS: ProgramView[] = [
+  { name: "Cover", open: 0, flip: 0, focus: 0 },
+  { name: "Inside", open: 1, flip: 0, focus: 0 },
+  { name: "Back", open: 0, flip: 1, focus: 0 },
+];
+
+/** Tall screens (phones) are too narrow for the spread, so the inside comes one page at a time. */
+const TALL_VIEWS: ProgramView[] = [
+  { name: "Cover", open: 0, flip: 0, focus: 0 },
+  { name: "Inside left", open: 1, flip: 0, focus: -1 },
+  { name: "Inside right", open: 1, flip: 0, focus: 1 },
+  { name: "Back", open: 0, flip: 1, focus: 0 },
+];
 
 /** Everything the sequences animate. The render loop reads it every frame. */
 interface SceneState {
@@ -37,7 +76,23 @@ interface SceneState {
   flicker: number;
   weave: number;
   fade: number;
+  /** 0 standing on the table, 1 held up to the camera. */
+  paper: number;
+  /** The program's fold: 0 closed, 1 opened flat. */
+  open: number;
+  /** 1 turns the closed program over to its back. */
+  flip: number;
+  /** Which inside page is centered while it's open (see ProgramView). */
+  focus: number;
 }
+
+const UP = new THREE.Vector3(0, 1, 0);
+const tablePos = new THREE.Vector3();
+const tableQuat = new THREE.Quaternion();
+const heldPos = new THREE.Vector3();
+const forward = new THREE.Vector3();
+const up = new THREE.Vector3();
+const right = new THREE.Vector3();
 
 const IDLE_LOOK = { grain: 0.045, flicker: 0.0, weave: 0.0 };
 const FILM_LOOK = { grain: 0.1, flicker: 0.1, weave: 1.4 };
@@ -47,7 +102,11 @@ export interface TheaterOptions {
   /** Return true when the visitor has already seen the full opening. */
   seenIntro: () => boolean;
   onMode: (mode: Mode) => void;
-  onHover: (hovering: boolean) => void;
+  onHover: (target: HoverTarget) => void;
+  /** The held program turned to another view; first and last say whether it can turn further. */
+  onProgramPage: (name: string, first: boolean, last: boolean) => void;
+  /** Called after every rendered frame. */
+  onFrame?: () => void;
 }
 
 export class Theater {
@@ -66,6 +125,8 @@ export class Theater {
   private beam!: Beam;
   private roomDust!: ReturnType<typeof buildRoomDust>;
   private film!: Film;
+  private program!: ProgramPaper;
+  private veil!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private screenLight!: THREE.RectAreaLight;
   private spot!: THREE.SpotLight;
   private ventLight!: THREE.PointLight;
@@ -80,13 +141,21 @@ export class Theater {
     cam: 0,
     ...IDLE_LOOK,
     fade: 1,
+    paper: 0,
+    open: PROGRAM.open,
+    flip: 0,
+    focus: 0,
   };
   private tl: gsap.core.Timeline | null = null;
+  private paperTl: gsap.core.Timeline | null = null;
+  private view = 0;
+  private paperHover = 0;
+  private glint = 0;
   private raf = 0;
   private last = 0;
   private time = 0;
   private hover = 0;
-  private hovering = false;
+  private hovering: HoverTarget = null;
   private pointer = new THREE.Vector2(0, 0);
   private parallax = new THREE.Vector2(0, 0);
   private size = { w: 1, h: 1 };
@@ -144,6 +213,16 @@ export class Theater {
     this.beam = buildBeam(this.projector.lensWorld, corners);
     scene.add(this.beam.group);
 
+    this.program = buildProgram(small ? 0.6 : 1, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+    scene.add(this.program.group);
+    // Dims the room behind the program while it's held up.
+    this.veil = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.veil.visible = false;
+    scene.add(this.veil);
+
     this.roomDust = buildRoomDust(this.room.lamp.position.clone().add(new THREE.Vector3(0.5, 0.05, 0.5)), 0.9);
     scene.add(this.roomDust.points);
 
@@ -177,7 +256,7 @@ export class Theater {
     this.resize();
     window.addEventListener("resize", () => this.resize());
     this.canvas.addEventListener("pointermove", (e) => this.onPointerMove(e));
-    this.canvas.addEventListener("pointerleave", () => this.setHovering(false));
+    this.canvas.addEventListener("pointerleave", () => this.setHovering(null));
 
     renderer.shadowMap.needsUpdate = true;
     this.applyState(0);
@@ -186,18 +265,145 @@ export class Theater {
     gsap.to(this.state, { fade: 0, duration: this.opts.reducedMotion ? 0.01 : 1.4, ease: "power1.out" });
   }
 
-  /** Whether a click at this client position lands on the projector. */
-  hitsProjector(clientX: number, clientY: number) {
+  private raycast(clientX: number, clientY: number, targets: THREE.Object3D[]) {
     const rect = this.canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.camera);
-    return this.raycaster.intersectObjects(this.projector.hitTargets, true).length > 0;
+    return this.raycaster.intersectObjects(targets, true);
   }
 
-  /** Run the opening: full on a first visit, short after that. */
+  /** Whether a click at this client position lands on the projector. */
+  hitsProjector(clientX: number, clientY: number) {
+    return this.raycast(clientX, clientY, this.projector.hitTargets).length > 0;
+  }
+
+  /** Whether a click at this client position lands on the program. */
+  hitsProgram(clientX: number, clientY: number) {
+    return this.raycast(clientX, clientY, this.program.meshes).length > 0;
+  }
+
+  /** What a click does while the program is held up. Null means it missed the paper. */
+  programHit(clientX: number, clientY: number): ProgramHit | null {
+    const hit = this.raycast(clientX, clientY, this.program.meshes)[0];
+    if (!hit) return null;
+    // The held paper is always centered, so the halves of the screen are the halves of the paper.
+    const rect = this.canvas.getBoundingClientRect();
+    return { action: this.program.actionAt(hit), side: clientX < rect.left + rect.width / 2 ? -1 : 1 };
+  }
+
+  /** Where the top of the program is on screen while it stands on the table, for the pick-up prompt. */
+  programAnchor() {
+    if (this.state.paper > 0.01) return null;
+    const p = PROGRAM.position.clone();
+    p.y += PAPER.h + 0.035;
+    p.project(this.camera);
+    if (p.z > 1 || Math.abs(p.x) > 1 || Math.abs(p.y) > 1) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
+  }
+
+  /** Make the program shimmer on the table, like an item a game wants you to pick up. */
+  setGlint(on: boolean) {
+    gsap.to(this, { glint: on ? 1 : 0, duration: 0.6 });
+  }
+
+  private quick(seconds: number) {
+    return this.opts.reducedMotion ? 0.01 : seconds;
+  }
+
+  private get views() {
+    return this.size.w / this.size.h < 0.9 ? TALL_VIEWS : WIDE_VIEWS;
+  }
+
+  private showView() {
+    const views = this.views;
+    this.opts.onProgramPage(views[this.view].name, this.view === 0, this.view === views.length - 1);
+  }
+
+  /** Pick the program up off the table and hold it up to the camera, cover first. */
+  pickUp() {
+    if (this.mode !== "idle") return;
+    this.setMode("program");
+    this.setHovering(null);
+    this.view = 0;
+    this.showView();
+    this.sound.rustle();
+    this.paperTl?.kill();
+    this.paperTl = gsap.timeline({ onComplete: () => (this.paperTl = null) });
+    this.paperTl.to(this.state, { paper: 1, open: 0, flip: 0, focus: 0, duration: this.quick(0.75), ease: "power2.inOut" });
+  }
+
+  /** Stand the program back on the table. Resolves once it's down. */
+  putDown(): Promise<void> {
+    if (this.mode !== "program") return Promise.resolve();
+    this.sound.rustle(0.6);
+    this.paperTl?.kill();
+    return new Promise((resolve) => {
+      this.paperTl = gsap.timeline({
+        onComplete: () => {
+          this.paperTl = null;
+          this.setMode("idle");
+          resolve();
+        },
+      });
+      this.paperTl.to(this.state, {
+        paper: 0,
+        open: PROGRAM.open,
+        flip: 0,
+        focus: 0,
+        duration: this.quick(0.7),
+        ease: "power2.inOut",
+      });
+    });
+  }
+
+  /** Turn the held program: open it to the inside, slide between inside pages, or close it and turn it over. */
+  turn(dir: -1 | 1) {
+    if (this.mode !== "program" || this.paperTl) return;
+    const views = this.views;
+    const next = clamp(this.view + dir, 0, views.length - 1);
+    if (next === this.view) return;
+    const from = views[this.view];
+    const to = views[next];
+    this.view = next;
+    this.showView();
+    this.sound.rustle(0.8);
+    const s = this.state;
+    const tl = gsap.timeline({ onComplete: () => (this.paperTl = null) });
+    this.paperTl = tl;
+    const ease = "power2.inOut";
+    // Turning it over needs it closed first.
+    if (from.flip !== to.flip) {
+      if (from.open) tl.to(s, { open: 0, focus: 0, duration: this.quick(0.45), ease });
+      tl.to(s, { flip: to.flip, duration: this.quick(0.55), ease });
+      if (to.open) tl.to(s, { open: to.open, focus: to.focus, duration: this.quick(0.45), ease });
+    } else {
+      tl.to(s, { open: to.open, focus: to.focus, duration: this.quick(0.6), ease });
+    }
+  }
+
+  /** Back to the room with the lights up, from wherever things were (the page came back from the browser's cache). */
+  reset() {
+    this.tl?.kill();
+    this.tl = null;
+    this.paperTl?.kill();
+    this.paperTl = null;
+    this.sound.stopMotor(0.2);
+    Object.assign(this.state, { lamp: 1, running: 0, reels: 0, beam: 0, screen: 0, cam: 0, ...IDLE_LOOK, fade: 0 });
+    Object.assign(this.state, { paper: 0, open: PROGRAM.open, flip: 0, focus: 0 });
+    this.film.set("dark");
+    this.setMode("idle");
+    this.startLoop();
+  }
+
+  /**
+   * Run the opening: full on a first visit, short after that. After the countdown the
+   * screen goes back to bare projector light and the camera moves into it; what's
+   * playing stays a surprise until the reel loads.
+   */
   start() {
     if (this.mode !== "idle") return;
     if (this.opts.reducedMotion) {
@@ -206,7 +412,7 @@ export class Theater {
     }
     const full = !this.opts.seenIntro();
     this.setMode("playing");
-    this.setHovering(false);
+    this.setHovering(null);
     this.sound.clunk();
     const s = this.state;
     const tl = gsap.timeline({ onComplete: () => this.finishEnter() });
@@ -232,7 +438,7 @@ export class Theater {
       tl.to(s, { ...FILM_LOOK, duration: 0.4 }, 0.35);
       tl.call(() => this.film.set("countdown"), [], 0.95);
       tl.call(() => this.sound.pop(), [], 0.95 + COUNT_STEP);
-      tl.call(() => this.film.set("title"), [], 0.95 + COUNT_STEP * 3);
+      tl.call(() => this.film.set("leader"), [], 0.95 + COUNT_STEP * 3);
       tl.to(s, { cam: 1, duration: 1.25, ease: "power2.inOut" }, 2.95);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 1.0 }, 3.0);
       tl.call(() => this.beginCrossfade(), [], 3.8);
@@ -245,7 +451,6 @@ export class Theater {
       tl.call(() => this.film.set("leader"), [], 0.15);
       tl.to(s, { beam: 1, screen: 1, duration: 0.2 }, 0.15);
       tl.to(s, { ...FILM_LOOK, duration: 0.3 }, 0.15);
-      tl.call(() => this.film.set("title"), [], 0.5);
       tl.to(s, { cam: 1, duration: 1.05, ease: "power2.inOut" }, 0.55);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 0.8 }, 0.6);
       tl.call(() => this.beginCrossfade(), [], 1.35);
@@ -266,7 +471,7 @@ export class Theater {
     if (this.mode !== "playing") return;
     this.tl?.kill();
     this.tl = null;
-    this.film.set("title");
+    this.film.set("leader");
     gsap.to(this.state, { beam: 1, screen: 1, lamp: 0.035, running: 1, duration: 0.2 });
     this.beginCrossfade();
     window.setTimeout(() => this.finishEnter(), 450);
@@ -281,13 +486,14 @@ export class Theater {
     window.setTimeout(() => this.finishEnter(), 450);
   }
 
-  /** Run the ending: "The End", the film runs out, the camera pulls back, the lights come up. */
-  end() {
+  /** Run the ending: the screen shows the reel that was playing, the film runs out, the camera pulls back, the lights come up. */
+  end(reel: ReelId = "about") {
     if (this.mode !== "entered") return;
     const s = this.state;
     this.tl?.kill();
     Object.assign(s, { cam: 1, lamp: 0.035, beam: 1, screen: 1, running: 1, reels: 1, ...FILM_LOOK, fade: 0 });
-    this.film.set("end");
+    this.film.show(paintReelStill(reel));
+    this.film.set("reel");
     this.setMode("ending");
     this.startLoop();
 
@@ -304,14 +510,14 @@ export class Theater {
     tl.call(() => {
       this.film.set("runout");
       this.sound.runout(1.2);
-    }, [], 1.5);
-    tl.to(s, { cam: 0, duration: 1.4, ease: "power2.inOut" }, 1.6);
-    tl.to(s, { beam: 0, screen: 0, running: 0, duration: 0.35, ease: "power1.in" }, 2.45);
-    tl.call(() => this.film.set("dark"), [], 2.8);
-    tl.call(() => this.sound.stopMotor(1.1), [], 2.45);
-    tl.to(s, { reels: 0, duration: 1.1, ease: "power2.out" }, 2.45);
-    tl.to(s, { lamp: 1, duration: 0.9, ease: "power1.inOut" }, 2.8);
-    tl.to(s, { ...IDLE_LOOK, duration: 0.8 }, 2.8);
+    }, [], 0.7);
+    tl.to(s, { cam: 0, duration: 1.4, ease: "power2.inOut" }, 0.8);
+    tl.to(s, { beam: 0, screen: 0, running: 0, duration: 0.35, ease: "power1.in" }, 1.65);
+    tl.call(() => this.film.set("dark"), [], 2.0);
+    tl.call(() => this.sound.stopMotor(1.1), [], 1.65);
+    tl.to(s, { reels: 0, duration: 1.1, ease: "power2.out" }, 1.65);
+    tl.to(s, { lamp: 1, duration: 0.9, ease: "power1.inOut" }, 2.0);
+    tl.to(s, { ...IDLE_LOOK, duration: 0.8 }, 2.0);
   }
 
   private beginCrossfade() {
@@ -340,24 +546,31 @@ export class Theater {
     this.opts.onMode(mode);
   }
 
-  private setHovering(on: boolean) {
-    if (on === this.hovering) return;
-    this.hovering = on;
-    this.canvas.style.cursor = on ? "pointer" : "";
-    this.opts.onHover(on);
+  private setHovering(target: HoverTarget) {
+    if (target === this.hovering) return;
+    this.hovering = target;
+    this.canvas.style.cursor = target ? "pointer" : "";
+    this.opts.onHover(target);
   }
 
   private onPointerMove(e: PointerEvent) {
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-    if (this.mode === "idle" && e.pointerType === "mouse") {
-      this.setHovering(this.hitsProjector(e.clientX, e.clientY));
+    if (e.pointerType !== "mouse") return;
+    if (this.mode === "idle") {
+      const x = e.clientX;
+      const y = e.clientY;
+      this.setHovering(this.hitsProgram(x, y) ? "program" : this.hitsProjector(x, y) ? "projector" : null);
+    } else if (this.mode === "program") {
+      // The pointer shows over the paper (turn the page, follow a reel or link); off it, a click puts it down.
+      this.canvas.style.cursor = this.hitsProgram(e.clientX, e.clientY) ? "pointer" : "";
     }
   }
 
   resize() {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
+    const before = this.views;
     this.size = { w, h };
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
@@ -367,6 +580,17 @@ export class Theater {
     this.camera.aspect = w / h;
     this.applyCamera();
     if (this.mode === "entered") this.composer.render();
+    // Turning a phone between tall and wide while holding the program: keep showing the same part of it.
+    const views = this.views;
+    if (views !== before && this.mode === "program") {
+      const current = before[this.view];
+      this.view = Math.max(0, views.findIndex((v) => v.open === current.open && v.flip === current.flip));
+      this.paperTl?.kill();
+      this.paperTl = null;
+      const { open, flip, focus } = views[this.view];
+      Object.assign(this.state, { open, flip, focus });
+      this.showView();
+    }
   }
 
   private startLoop() {
@@ -379,6 +603,7 @@ export class Theater {
       this.time += dt;
       this.applyState(dt);
       this.composer.render(dt);
+      this.opts.onFrame?.();
     };
     this.raf = requestAnimationFrame(tick);
   }
@@ -421,8 +646,8 @@ export class Theater {
     const c = this.state.cam;
     const eye = a.eye.clone().lerp(b.eye, c);
     const look = a.look.clone().lerp(b.look, c);
-    // Small parallax and breathing while sitting on the couch.
-    const still = this.opts.reducedMotion ? 0 : 1 - c;
+    // Small parallax and breathing while sitting on the couch, calmer while reading the program.
+    const still = this.opts.reducedMotion ? 0 : (1 - c) * (1 - 0.85 * this.state.paper);
     eye.x += this.parallax.x * 0.08 * still + Math.sin(this.time * 0.35) * 0.006 * still;
     eye.y += this.parallax.y * 0.04 * still + Math.sin(this.time * 0.5) * 0.004 * still;
     this.camera.position.copy(eye);
@@ -436,7 +661,9 @@ export class Theater {
     if (!this.opts.reducedMotion) {
       this.parallax.lerp(this.pointer, 1 - Math.exp(-dt * 2.5));
     }
-    this.hover += ((this.hovering ? 1 : 0) - this.hover) * (1 - Math.exp(-dt * 10));
+    const ease = 1 - Math.exp(-dt * 10);
+    this.hover += ((this.hovering === "projector" ? 1 : 0) - this.hover) * ease;
+    this.paperHover += ((this.hovering === "program" ? 1 : 0) - this.paperHover) * ease;
 
     // Lamp.
     const lamp = this.room.lamp;
@@ -463,7 +690,8 @@ export class Theater {
     // the lamp and the lens spill don't wash out the dark parts of the image.
     this.room.screen.material.color.setScalar(1 - 0.94 * s.screen);
     this.room.screen.material.emissiveIntensity = s.screen * lerp(1.2, 0.85, s.cam);
-    this.bloom.strength = lerp(0.55, 0.22, s.cam);
+    // Bloom would blur the print, so it drops while the program is held up.
+    this.bloom.strength = lerp(lerp(0.55, 0.22, s.cam), 0.05, s.paper);
     this.screenLight.intensity = s.screen * (0.15 + b) * 4.5;
     this.spot.intensity = s.screen * (0.3 + 0.7 * b) * 18;
     this.beam.update(drift, s.beam, b);
@@ -478,5 +706,58 @@ export class Theater {
     u.uVignette.value = lerp(0.42, 0.2, s.cam);
 
     this.applyCamera();
+    this.placeProgram();
+  }
+
+  /** Stand the program on the table, or hold it in front of the camera, or somewhere in between. */
+  private placeProgram() {
+    const s = this.state;
+    const cam = this.camera;
+    const { group } = this.program;
+    this.program.pose(s.open, s.flip, s.paper);
+    // On the table it catches a little lamp light; held up, it's lit to read.
+    const pulse = this.glint * (0.5 + 0.5 * Math.sin(this.time * 2.6)) * (1 - s.paper);
+    this.program.setGlow(lerp(0.03 + 0.07 * s.lamp + 0.12 * this.paperHover + 0.3 * pulse, 0.92, s.paper));
+
+    tablePos.copy(PROGRAM.position);
+    tablePos.y += PAPER.h / 2 + 0.012 * this.paperHover;
+    tableQuat.setFromAxisAngle(UP, PROGRAM.yaw);
+    if (s.paper <= 0) {
+      group.position.copy(tablePos);
+      group.quaternion.copy(tableQuat);
+      this.veil.visible = false;
+      return;
+    }
+
+    // Held close enough to fill most of the view: one page by its height (or width, on a phone), the open
+    // spread by its width. With an inside page in focus, that page is what fills the view.
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    const across = cam.aspect < 0.9 ? 0.95 : 0.9;
+    const fit = (w: number, h: number) => Math.max(h / (0.78 * 2 * tan), w / (across * 2 * tan * cam.aspect));
+    const page = fit(PAPER.w, PAPER.h);
+    const open = clamp(s.open, 0, 1);
+    // Drawn back a little while the cover swings toward the camera or the sheet turns over, so neither
+    // comes at the viewer.
+    const swing = Math.sin(Math.PI * open) * PAPER.w * 0.8 + Math.sin(Math.PI * clamp(s.flip, 0, 1)) * PAPER.w * 0.5;
+    const d = lerp(page, lerp(fit(PAPER.w * 2, PAPER.h), page, Math.abs(s.focus)), open) + swing;
+    forward.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    heldPos
+      .copy(cam.position)
+      .addScaledVector(forward, d)
+      .addScaledVector(up, 2 * d * tan * 0.04)
+      .addScaledVector(right, -s.focus * (PAPER.w / 2) * open);
+    // A little lift on the way up, so it's picked up rather than slid.
+    group.position.lerpVectors(tablePos, heldPos, s.paper).addScaledVector(UP, Math.sin(Math.PI * s.paper) * 0.06);
+    group.quaternion.slerpQuaternions(tableQuat, cam.quaternion, s.paper);
+
+    const vd = d + 0.04;
+    const vh = 2 * vd * tan * 1.3;
+    this.veil.position.copy(cam.position).addScaledVector(forward, vd);
+    this.veil.quaternion.copy(cam.quaternion);
+    this.veil.scale.set(vh * cam.aspect, vh, 1);
+    this.veil.material.opacity = 0.62 * s.paper;
+    this.veil.visible = true;
   }
 }

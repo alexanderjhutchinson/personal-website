@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { person } from "../data/profile";
 import { SCREEN } from "./layout";
-import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from "./textures";
+import { FONT_BODY } from "./textures";
 
 /** What the projector is showing. */
-export type FilmScene = "dark" | "leader" | "countdown" | "title" | "end" | "runout";
+/** "reel" is a still of one of the feature's reels, set with show(). */
+export type FilmScene = "dark" | "leader" | "countdown" | "reel" | "runout";
 
 /** Seconds each countdown number stays on screen. */
 export const COUNT_STEP = 0.6;
@@ -42,6 +42,8 @@ export class Film {
   private scratches: Scratch[] = [];
   private specks: { x: number; y: number; r: number; hair: boolean; a: number }[] = [];
   private grain: CanvasPattern[] = [];
+  private picture: HTMLCanvasElement | null = null;
+  private pictureLight = 0;
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -74,6 +76,22 @@ export class Film {
   set(scene: FilmScene) {
     this.scene = scene;
     this.sceneStart = this.time;
+  }
+
+  /** The picture the "reel" scene shows. */
+  show(picture: HTMLCanvasElement) {
+    this.picture = picture;
+    // Its average brightness, for the beam and the light it throws on the room.
+    const sample = document.createElement("canvas");
+    sample.width = 16;
+    sample.height = 9;
+    const s = sample.getContext("2d");
+    if (!s) return;
+    s.drawImage(picture, 0, 0, 16, 9);
+    const data = s.getImageData(0, 0, 16, 9).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11) / 255;
+    this.pictureLight = sum / (data.length / 4);
   }
 
   /** Seconds since the current scene started. */
@@ -152,11 +170,8 @@ export class Film {
         this.drawCountdown();
         light = true;
         break;
-      case "title":
-        this.drawTitleCard(person.name, `${person.program} · ${person.school}`, "Reel one");
-        break;
-      case "end":
-        this.drawTitleCard("The End", "Thanks for watching", "Fin");
+      case "reel":
+        this.drawPicture();
         break;
       case "runout":
         this.drawRunout();
@@ -248,90 +263,19 @@ export class Film {
     this.brightness = 0.6 * this.flicker;
   }
 
-  private drawTitleCard(heading: string, sub: string, eyebrow: string) {
-    const { ctx } = this;
-    const fadeIn = Math.min(1, this.elapsed / 0.25);
-    ctx.fillStyle = "#130e0b";
-    ctx.fillRect(-4, -4, W + 8, H + 8);
-    ctx.globalAlpha = fadeIn;
-
-    const ink = "#efe4cc";
-    const amber = "#e0a33a";
-    const inset = 70;
-    const x0 = B + inset;
-    const y0 = B + inset * 0.75;
-    const x1 = W - B - inset;
-    const y1 = H - B - inset * 0.75;
-
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(x0 + 11, y0 + 11, x1 - x0 - 22, y1 - y0 - 22);
-    // Corner ornaments.
-    for (const [x, y, sx, sy] of [
-      [x0, y0, 1, 1],
-      [x1, y0, -1, 1],
-      [x0, y1, 1, -1],
-      [x1, y1, -1, -1],
-    ]) {
-      ctx.fillStyle = amber;
-      ctx.beginPath();
-      ctx.moveTo(x, y - 9);
-      ctx.lineTo(x + 9, y);
-      ctx.lineTo(x, y + 9);
-      ctx.lineTo(x - 9, y);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(x + sx * 22, y + sy * 22, 12, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    const cx = W / 2;
-    const cy = H / 2;
-    ctx.fillStyle = amber;
-    ctx.font = `500 17px ${FONT_MONO}`;
-    if ("letterSpacing" in ctx) ctx.letterSpacing = "6px";
-    ctx.fillText(eyebrow.toUpperCase(), cx, cy - 78);
-    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
-
-    ctx.fillStyle = ink;
-    let size = 80;
-    ctx.font = `600 ${size}px ${FONT_DISPLAY}`;
-    while (ctx.measureText(heading).width > x1 - x0 - 120 && size > 40) {
-      size -= 4;
-      ctx.font = `600 ${size}px ${FONT_DISPLAY}`;
-    }
-    ctx.fillText(heading, cx, cy + 14);
-
-    // Rule with a diamond.
-    ctx.strokeStyle = amber;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - 110, cy + 44);
-    ctx.lineTo(cx - 14, cy + 44);
-    ctx.moveTo(cx + 14, cy + 44);
-    ctx.lineTo(cx + 110, cy + 44);
-    ctx.stroke();
-    ctx.fillStyle = amber;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + 37);
-    ctx.lineTo(cx + 7, cy + 44);
-    ctx.lineTo(cx, cy + 51);
-    ctx.lineTo(cx - 7, cy + 44);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = "#c9b99b";
-    ctx.font = `500 23px ${FONT_BODY}`;
-    ctx.fillText(sub, cx, cy + 92);
-    ctx.globalAlpha = 1;
-    this.brightness = 0.16 * fadeIn * this.flicker;
+  /** The reel's still, as large as fits inside the masking. */
+  private drawPicture() {
+    const { ctx, picture } = this;
+    if (!picture) return;
+    const iw = W - 2 * B;
+    const ih = H - 2 * B;
+    const scale = Math.min(iw / picture.width, ih / picture.height);
+    const w = picture.width * scale;
+    const h = picture.height * scale;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(picture, B + (iw - w) / 2, B + (ih - h) / 2, w, h);
+    ctx.imageSmoothingEnabled = true;
+    this.brightness = this.pictureLight * this.flicker;
   }
 
   private drawRunout() {

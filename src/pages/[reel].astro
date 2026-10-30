@@ -20,6 +20,7 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     <div class="stage" id="stage" data-reel={reel.id}>
       <div class="frame" id="frame">
         <canvas id="lobby-canvas" aria-label={`Reel ${reel.number}, ${reel.title}.`}></canvas>
+        <div class="film" aria-hidden="true"><canvas id="reel-grain"></canvas></div>
         <div class="hud">
           <ol class="hotbar" id="hotbar" aria-label="Hotbar"></ol>
           <p class="item-label" id="item-label" aria-live="polite"></p>
@@ -29,10 +30,19 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
           <span data-number>Reel {reel.number}</span>
           <span data-name>{reel.title}</span>
         </p>
-        <button id="door-prev" class="door prev" type="button" hidden={!prev}>
-          <span aria-hidden="true">←</span>
-          <span data-label>{prev && `Reel ${prev.number} · ${prev.title}`}</span>
-        </button>
+        <div class="corner">
+          <button id="lobby-sound" class="door sound" type="button" aria-pressed="false" aria-label="Sound">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
+              <g class="waves"><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path></g>
+              <g class="mute"><path d="M16 9.5l5 5M21 9.5l-5 5"></path></g>
+            </svg>
+          </button>
+          <button id="door-prev" class="door prev" type="button" hidden={!prev}>
+            <span aria-hidden="true">←</span>
+            <span data-label>{prev && `Reel ${prev.number} · ${prev.title}`}</span>
+          </button>
+        </div>
         <button id="door-next" class="door next" type="button" hidden={!next}>
           <span data-label>{next && `Reel ${next.number} · ${next.title}`}</span>
           <span aria-hidden="true">→</span>
@@ -66,25 +76,15 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     </div>
 
     <noscript>
-      <p class="noscript">The reels need JavaScript. Everything on them is also in <a href="/#resume">the program</a>.</p>
+      <p class="noscript">The reels need JavaScript. Everything on them is also in <a href="/program">the program</a>.</p>
     </noscript>
 
-    <div class="below">
-      <p class="help">
-        <span><kbd>A</kbd><kbd>D</kbd> move</span>
-        <span><kbd>Space</kbd> jump</span>
-        <span><kbd>S</kbd> drop down</span>
-        <span>Click to use</span>
-        <span><kbd>1</kbd>–<kbd>0</kbd> or scroll to switch items</span>
-        <span>Walk out a door to change reels</span>
-      </p>
-      <div class="links">
-        <button id="lobby-sound" class="reel-button" type="button" aria-pressed="false"><span data-label>Sound off</span></button>
-        <button id="tune-toggle" class="reel-button" type="button" hidden>Tune the feel</button>
-        <a class="back" href="/#resume">The program</a>
-        <a class="back" href="/">Back to the room</a>
-      </div>
-    </div>
+    <!-- Ends the film: the room opens inside the screen and plays the ending. -->
+    <a id="end-film" class="end-film" href={`/?end=${reel.id}`} aria-label="End the film" title="End the film">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+    </a>
 
     <aside class="tuning" id="tuning" aria-label="Tuning" hidden></aside>
 
@@ -272,49 +272,54 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     margin-bottom: 0.2rem;
   }
 
-  .below {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem 1.5rem;
-    width: min(100%, 1152px);
+  .end-film {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    color: #f4eedf;
+    background: rgba(20, 16, 36, 0.8);
+    border: 2px solid rgba(120, 110, 170, 0.8);
+    border-radius: 4px;
   }
 
-  .help {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 1.1rem;
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--ink-dim);
+  .end-film:hover {
+    color: #f2c14e;
+    border-color: #f2c14e;
   }
 
-  kbd {
-    display: inline-block;
-    min-width: 1.4em;
-    margin-right: 0.25em;
-    padding: 0 0.3em;
-    border: 1px solid var(--ink-faint);
-    border-radius: 3px;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    text-align: center;
-    color: var(--ink);
+  .end-film svg {
+    width: 18px;
+    height: 18px;
   }
 
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem 1rem;
+  /* The room's film look over the reel: grain, a soft vignette, and a faint flicker. */
+  .film {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.28));
+    animation: flicker 0.25s steps(2) infinite;
   }
 
-  .back {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
+  .film canvas {
+    width: 100%;
+    height: 100%;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    image-rendering: pixelated;
   }
+
+  @keyframes flicker {
+    50% {
+      opacity: 0.85;
+    }
+  }
+
 
   .tuning {
     position: fixed;
@@ -450,10 +455,17 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     }
   }
 
-  /* Door buttons: the character walks out that side, then the film cuts. */
-  .door {
+  /* Door buttons: the character walks out that side, then the film cuts. The sound
+     toggle shares their look and sits in the bottom-left corner beside the left door. */
+  .corner {
     position: absolute;
+    left: calc(var(--px) * 4);
     bottom: calc(var(--px) * 4);
+    display: flex;
+    gap: calc(var(--px) * 2);
+  }
+
+  .door {
     display: inline-flex;
     align-items: center;
     gap: 0.45em;
@@ -473,12 +485,28 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     border-color: #f2c14e;
   }
 
-  .door.prev {
-    left: calc(var(--px) * 4);
+  .door.next {
+    position: absolute;
+    right: calc(var(--px) * 4);
+    bottom: calc(var(--px) * 4);
   }
 
-  .door.next {
-    right: calc(var(--px) * 4);
+  .sound {
+    padding-inline: max(6px, calc(var(--px) * 2.5));
+  }
+
+  .sound svg {
+    width: 1.1em;
+    height: 1.1em;
+  }
+
+  .sound .waves,
+  .sound[aria-pressed="true"] .mute {
+    display: none;
+  }
+
+  .sound[aria-pressed="true"] .waves {
+    display: inline;
   }
 
   .door[hidden] {
@@ -705,6 +733,10 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .film {
+      animation: none;
+    }
+
     .reel-title:global(.show) {
       animation-name: reel-title-still;
     }

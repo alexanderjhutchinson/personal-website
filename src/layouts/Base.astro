@@ -26,14 +26,16 @@ const { title, description } = Astro.props;
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
-      // Decide before first paint whether to show the room or go straight to the resume.
+      // Decide before first paint whether to show the 3D room or the program on its own ("flat").
       (function () {
         var d = document.documentElement;
+        // Old links to the resume now go to the program.
+        if (location.pathname === "/" && location.hash === "#resume") return location.replace("/program");
         var webgl = false;
         try {
           webgl = typeof window.WebGL2RenderingContext !== "undefined";
         } catch (e) {}
-        d.dataset.mode = webgl && location.hash !== "#resume" ? "room" : "entered";
+        d.dataset.mode = webgl ? "room" : "flat";
       })();
     </script>
   </head>

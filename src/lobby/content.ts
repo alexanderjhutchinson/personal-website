@@ -184,7 +184,7 @@ export function mountContent() {
   }
 
   const dialog = document.getElementById("item-card") as HTMLDialogElement | null;
-  if (!dialog) return { isOpen: () => false };
+  if (!dialog) return;
   const cards = dialog.querySelectorAll<HTMLElement>("[data-card]");
 
   // Cards are keyed "reel/item". The open card's item goes in the address, like /projects#speakeasy.
@@ -209,6 +209,4 @@ export function mountContent() {
   const reel = document.getElementById("stage")?.dataset.reel;
   const linked = `${reel}/${decodeURIComponent(location.hash.slice(1))}`;
   if (location.hash && [...cards].some((card) => card.dataset.card === linked)) open(linked);
-
-  return { isOpen: () => dialog.open };
 }

@@ -1,10 +1,14 @@
+import { REELS, type Reel } from "../data";
+import type { RegionAction } from "./programPages";
 import type { Mode, Theater } from "./theater";
 
-// Connects the 3D scene to the page: buttons, keyboard, sound preference,
-// first-visit tracking, and the crossfade between the room and the resume.
+// Connects the 3D room to the page: buttons, keyboard, sound preference,
+// first-visit tracking, the program (picked up and turned), and the hand-off
+// from the opening to the feature's first reel.
 
 const SEEN_KEY = "movie-night:seen-intro";
 const SOUND_KEY = "movie-night:sound";
+const PROGRAM_KEY = "movie-night:read-program";
 
 function read(key: string) {
   try {
@@ -22,38 +26,47 @@ function write(key: string, value: string) {
   }
 }
 
-type PageMode = "room" | "playing" | "entering" | "entered" | "ending";
+/** "flat" is the page without the 3D room: the program on its own. */
+type PageMode = "room" | "program" | "playing" | "entering" | "ending" | "flat";
 
 const pageMode: Record<Mode, PageMode> = {
   idle: "room",
+  program: "program",
   playing: "playing",
   entering: "entering",
-  entered: "entered",
+  entered: "entering",
   ending: "ending",
 };
 
 export function boot() {
   const root = document.documentElement;
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
+  const stage = $("stage");
   const canvas = $<HTMLCanvasElement>("scene");
-  const startButton = $<HTMLButtonElement>("start-film");
   const soundButton = $<HTMLButtonElement>("sound-toggle");
-  const skipLink = $<HTMLAnchorElement>("skip-to-resume");
-  const resume = $("resume");
-  const endButtons = document.querySelectorAll<HTMLButtonElement>("[data-end-film]");
-  if (!canvas || !resume) return;
+  const readLink = $<HTMLAnchorElement>("read-program");
+  const pickup = $("pickup");
+  const viewName = document.querySelector("[data-view-name]");
+  const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
+  if (!stage || !canvas) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const openProgram = stage.dataset.open === "program";
+  // A reel's × links here with ?end=<reel>: the room opens inside the screen on that reel and plays the ending.
+  const endParam = new URLSearchParams(location.search).get("end");
+  const endingOn = endParam === null ? null : (REELS.find((r) => r.id === endParam) ?? REELS[0]);
   const setPageMode = (mode: PageMode) => {
     root.dataset.mode = mode;
   };
 
   let theater: Theater | null = null;
   let loading: Promise<Theater | null> | null = null;
+  /** The reel the film opens on. */
+  let feature: Reel = REELS[0];
 
-  const fallBackToResume = (err: unknown) => {
-    console.warn("The 3D room couldn't start, showing the resume instead.", err);
-    setPageMode("entered");
+  const fallBack = (err: unknown) => {
+    console.warn("The 3D room couldn't start, showing the program instead.", err);
+    setPageMode("flat");
     root.dataset.scene = "unavailable";
   };
 
@@ -66,19 +79,32 @@ export function boot() {
           reducedMotion,
           seenIntro: () => read(SEEN_KEY) === "1",
           onMode: (mode) => onMode(mode),
-          onHover: (on) => {
-            root.dataset.hover = on ? "projector" : "";
+          onHover: (target) => {
+            root.dataset.hover = target ?? "";
+            updatePrompt();
           },
+          onProgramPage: (name, first, last) => renderView(name, first, last),
+          onFrame: () => placePrompt(),
         });
         await t.init();
         if (import.meta.env.DEV) (window as unknown as { theater: Theater }).theater = t;
         t.sound.setEnabled(soundOn);
         theater = t;
         delete root.dataset.loading;
+        if (endingOn) {
+          history.replaceState(null, "", "/");
+          t.assumeEntered();
+          t.end(endingOn.id);
+        } else if (openProgram) {
+          pickUp();
+        } else {
+          // Give the room a moment to fade in before pointing at the program.
+          window.setTimeout(updatePrompt, reducedMotion ? 0 : 1200);
+        }
         return t;
       })
       .catch((err) => {
-        fallBackToResume(err);
+        fallBack(err);
         return null;
       });
     return loading;
@@ -86,19 +112,14 @@ export function boot() {
 
   const onMode = (mode: Mode) => {
     setPageMode(pageMode[mode]);
+    // The address follows the program, so a reload or a shared link opens it again.
+    if (mode === "program" && location.pathname !== "/program") history.replaceState(null, "", "/program");
+    if (mode === "idle" && location.pathname === "/program") history.replaceState(null, "", "/");
     if (mode === "entered") {
       write(SEEN_KEY, "1");
-      history.replaceState(null, "", "#resume");
-      window.scrollTo(0, 0);
-      resume.focus({ preventScroll: true });
-      startGrain();
-    } else {
-      stopGrain();
+      location.assign(feature.path);
     }
-    if (mode === "idle") {
-      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
-      startButton?.focus({ preventScroll: true });
-    }
+    updatePrompt();
   };
 
   // Sound preference.
@@ -117,72 +138,117 @@ export function boot() {
     theater?.sound.setEnabled(soundOn);
   });
 
-  const start = () => theater?.start();
+  // The program.
+  const pickUp = () => {
+    if (!theater || theater.mode !== "idle") return;
+    write(PROGRAM_KEY, "1");
+    theater.pickUp();
+  };
 
-  startButton?.addEventListener("click", start);
+  const putDown = () => void theater?.putDown();
 
+  /** Start the film; it opens on this reel. */
+  const startFeature = async (reel: Reel) => {
+    feature = reel;
+    if (!theater) {
+      location.assign(reel.path);
+      return;
+    }
+    await theater.putDown();
+    theater.start();
+  };
+
+  const follow = (action: RegionAction) => {
+    if ("reel" in action) {
+      const reel = REELS.find((r) => r.id === action.reel);
+      if (reel) void startFeature(reel);
+    } else if (action.href.startsWith("http")) {
+      window.open(action.href, "_blank", "noopener");
+    } else {
+      location.href = action.href;
+    }
+  };
+
+  const renderView = (name: string, first: boolean, last: boolean) => {
+    if (viewName) viewName.textContent = name;
+    turnButtons.forEach((b) => (b.disabled = Number(b.dataset.turn) < 0 ? first : last));
+  };
+  renderView("Cover", true, false);
+
+  // The pick-up prompt: points at the program on the table until it's been picked up once, then only on hover.
+  const updatePrompt = () => {
+    if (!pickup) return;
+    const idle = !!theater && theater.mode === "idle" && !root.dataset.loading;
+    const fresh = read(PROGRAM_KEY) !== "1";
+    pickup.hidden = !(idle && (fresh || root.dataset.hover === "program"));
+    theater?.setGlint(idle && fresh);
+    placePrompt();
+  };
+  const placePrompt = () => {
+    if (!pickup || pickup.hidden || !theater) return;
+    const at = theater.programAnchor();
+    pickup.style.visibility = at ? "" : "hidden";
+    if (at) pickup.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+  };
+
+  // Pointer.
   canvas.addEventListener("click", (e) => {
     if (!theater) return;
+    const { clientX: x, clientY: y } = e;
     if (theater.mode === "playing") theater.skip();
-    else if (theater.mode === "idle" && theater.hitsProjector(e.clientX, e.clientY)) theater.start();
-  });
-
-  skipLink?.addEventListener("click", (e) => {
-    if (!theater || root.dataset.mode === "entered") return;
-    e.preventDefault();
-    theater.enterQuick();
-  });
-
-  endButtons.forEach((button) =>
-    button.addEventListener("click", async () => {
-      const t = theater ?? (await load());
-      if (!t) return;
-      if (t.mode === "idle" && root.dataset.mode === "entered") t.assumeEntered();
-      t.end();
-    }),
-  );
-
-  document.addEventListener("keydown", (e) => {
-    if (!theater) return;
-    const target = e.target as HTMLElement | null;
-    const onControl = !!target?.closest("button, a, input, textarea, select");
-    if (theater.mode === "playing" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      e.preventDefault();
-      theater.skip();
-    } else if (theater.mode === "idle" && !onControl && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      theater.start();
+    else if (theater.mode === "idle") {
+      if (theater.hitsProgram(x, y)) pickUp();
+      else if (theater.hitsProjector(x, y)) void startFeature(REELS[0]);
+    } else if (theater.mode === "program") {
+      const hit = theater.programHit(x, y);
+      if (!hit) putDown();
+      else if (hit.action) follow(hit.action);
+      else theater.turn(hit.side);
     }
   });
 
-  // Faint grain over the resume, like light from a projector.
-  const grain = $<HTMLCanvasElement>("grain");
-  let grainTimer = 0;
-  const startGrain = () => {
-    if (!grain || reducedMotion || grainTimer) return;
-    const ctx = grain.getContext("2d");
-    if (!ctx) return;
-    grain.width = grain.height = 160;
-    const img = ctx.createImageData(160, 160);
-    const draw = () => {
-      for (let i = 0; i < img.data.length; i += 4) {
-        const v = Math.random() * 255;
-        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-        img.data[i + 3] = 255;
-      }
-      ctx.putImageData(img, 0, 0);
-    };
-    draw();
-    grainTimer = window.setInterval(draw, 1000 / 12);
-  };
-  const stopGrain = () => {
-    window.clearInterval(grainTimer);
-    grainTimer = 0;
-  };
+  readLink?.addEventListener("click", (e) => {
+    if (!theater || (theater.mode !== "idle" && theater.mode !== "program")) return;
+    e.preventDefault();
+    pickUp();
+  });
 
-  if (root.dataset.mode === "room") {
-    void load();
-  } else {
-    startGrain();
-  }
+  turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
+  document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
+
+  // Keyboard.
+  document.addEventListener("keydown", (e) => {
+    if (!theater || e.metaKey || e.ctrlKey || e.altKey) return;
+    const onControl = e.target instanceof Element && !!e.target.closest("button, a, input, textarea, select");
+    const key = e.key.toLowerCase();
+    switch (theater.mode) {
+      case "playing":
+        e.preventDefault();
+        theater.skip();
+        break;
+      case "idle":
+        if (key === "e") {
+          e.preventDefault();
+          pickUp();
+        } else if (!onControl && (key === "enter" || key === " ")) {
+          e.preventDefault();
+          void startFeature(REELS[0]);
+        }
+        break;
+      case "program":
+        if (key === "escape" || key === "e") putDown();
+        else if (key === "arrowleft" || key === "a") theater.turn(-1);
+        else if (key === "arrowright" || key === "d") theater.turn(1);
+        else return;
+        e.preventDefault();
+        break;
+    }
+  });
+
+  // Coming back with the browser's back button can restore this page mid-hand-off: bring the lights back up.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted && theater && (theater.mode === "entering" || theater.mode === "entered")) theater.reset();
+  });
+
+  if (root.dataset.mode === "room") void load();
 }

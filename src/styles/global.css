@@ -1,5 +1,10 @@
-/* Layout: a dark room. The resume reads like light projected on a screen, with
-   silent-film title cards for headings. Deliberately dark-only. */
+/* Layout: a dark room, with silent-film title cards for headings. The program is
+   the one light thing: cream paper. Deliberately dark-only. */
+/* Crossfade between pages where the browser supports it: the room into the first reel, reel to reel. */
+@view-transition {
+  navigation: auto;
+}
+
 :root {
   color-scheme: dark;
   --night: #0f0b08;
