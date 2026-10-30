@@ -1,6 +1,6 @@
 ---
 interface Props {
-  /** Open with the program picked up and in its high-def view. */
+  /** Open with the program already picked up. */
   open?: "program";
 }
 const { open } = Astro.props;
@@ -39,7 +39,6 @@ const { open } = Astro.props;
     <button class="reel-button" type="button" data-turn="-1" aria-label="Previous page"><span aria-hidden="true">◀</span></button>
     <span class="view-name" data-view-name aria-live="polite">Cover</span>
     <button class="reel-button" type="button" data-turn="1" aria-label="Next page"><span aria-hidden="true">▶</span></button>
-    <button class="reel-button" type="button" data-read>Read <kbd>R</kbd></button>
     <button class="reel-button" type="button" data-put-down>Put it down <kbd>Esc</kbd></button>
   </div>
 
@@ -273,7 +272,7 @@ const { open } = Astro.props;
     transition: opacity 0.3s;
   }
 
-  :global(html[data-mode="program"]:not([data-reading="open"])) .paper-bar {
+  :global(html[data-mode="program"]) .paper-bar {
     opacity: 1;
     pointer-events: auto;
     transition-delay: 0.35s;

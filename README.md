@@ -25,13 +25,13 @@ Then open http://localhost:4321.
 | `src/data/jobs/`, `src/data/projects/` | One file per job or project. Add a file and it shows up on its reel and in the program. |
 | `src/data/profile.ts` | Name, education, skills, about, contact links. |
 | `src/data/index.ts` | Loads the content, formats dates, lists the reels, and turns content into reel items. |
-| `src/data/program.ts` | What's printed in the program, page by page. The 3D paper and its high-def view both use it. |
-| `src/pages/index.astro` | The room: the 3D stage plus the program's high-def view. |
-| `src/pages/program.astro` | The same room, opened with the program picked up and in its high-def view. |
+| `src/data/program.ts` | What's printed in the program, page by page. The 3D paper and the plain HTML version both use it. |
+| `src/pages/index.astro` | The room: the 3D stage, plus the program as plain HTML for when the room can't run. |
+| `src/pages/program.astro` | The same room, opened with the program already picked up. |
 | `src/pages/[reel].astro` | The reel pages: game canvas, door buttons, the reel's item panel, and item cards. |
 | `src/components/Stage.astro` | Canvas and everything over the room: sound, the pick-up prompt, the controls while holding the program. |
-| `src/components/Program.astro` | The program in HTML, printed on cream paper: the high-def view. |
-| `src/components/ProgramView.astro` | The high-def view over the room. Without JavaScript or WebGL, it's the whole page. |
+| `src/components/Program.astro` | The program in HTML, printed on cream paper. |
+| `src/components/ProgramView.astro` | The program as the whole page, shown only without JavaScript or WebGL. |
 | `src/scene/theater.ts` | The 3D controller: renderer, camera framing, and the opening, skip, and ending sequences (GSAP timelines). |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, window, screen. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
@@ -55,13 +55,13 @@ Then open http://localhost:4321.
 
 ## How it behaves
 
-- **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. R switches to the high-def view; Escape puts it down. On a phone it goes straight to the high-def view.
+- **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. Links printed on it work. Escape puts it down.
 - **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves into it, landing on the reel: Reel 1 (`/about`), or the one picked in the program. No title cards, and no preview of the reel.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
 - **No WebGL or no JavaScript:** the program shows on its own.
-- **Addresses:** `/program` opens the room with the program picked up and in its high-def view; it's the link for someone who wants the resume. Old `/#resume` links go there. The × in a reel's top-right corner ends the film: the room opens inside the screen on that reel (`/?end=experience`), then the film runs out and the lights come up.
+- **Addresses:** `/program` opens the room with the program already picked up; it's the link for someone who wants the resume. Old `/#resume` links go there. The × in a reel's top-right corner ends the film: the room opens inside the screen on that reel (`/?end=experience`), then the film runs out and the lights come up.
 
 On the reels:
 

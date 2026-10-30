@@ -3,7 +3,7 @@ import type { RegionAction } from "./programPages";
 import type { Mode, Theater } from "./theater";
 
 // Connects the 3D room to the page: buttons, keyboard, sound preference,
-// first-visit tracking, the program (picked up, turned, read), and the hand-off
+// first-visit tracking, the program (picked up and turned), and the hand-off
 // from the opening to the feature's first reel.
 
 const SEEN_KEY = "movie-night:seen-intro";
@@ -38,8 +38,7 @@ const pageMode: Record<Mode, PageMode> = {
   ending: "ending",
 };
 
-/** Pages of the high-def view that match each held view: cover, inside spread, back. */
-const VIEW_PAGES = [0, 1, 3];
+/** The held program's views, as the controls name them. */
 const VIEW_NAMES = ["Cover", "Inside", "Back"];
 
 export function boot() {
@@ -50,10 +49,9 @@ export function boot() {
   const soundButton = $<HTMLButtonElement>("sound-toggle");
   const readLink = $<HTMLAnchorElement>("read-program");
   const pickup = $("pickup");
-  const view = $("program-view");
   const viewName = document.querySelector("[data-view-name]");
   const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
-  if (!stage || !canvas || !view) return;
+  if (!stage || !canvas) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const openProgram = stage.dataset.open === "program";
@@ -102,7 +100,6 @@ export function boot() {
           t.end(endingOn.id);
         } else if (openProgram) {
           pickUp();
-          setReading(true);
         } else {
           // Give the room a moment to fade in before pointing at the program.
           window.setTimeout(updatePrompt, reducedMotion ? 0 : 1200);
@@ -118,7 +115,6 @@ export function boot() {
 
   const onMode = (mode: Mode) => {
     setPageMode(pageMode[mode]);
-    if (mode !== "program") setReading(false);
     // The address follows the program, so a reload or a shared link opens it again.
     if (mode === "program" && location.pathname !== "/program") history.replaceState(null, "", "/program");
     if (mode === "idle" && location.pathname === "/program") history.replaceState(null, "", "/");
@@ -146,39 +142,13 @@ export function boot() {
   });
 
   // The program.
-  // data-reading is "open" while the high-def view is up, then "closing" while it fades away.
-  const reading = () => root.dataset.reading === "open";
-  const narrow = () => window.innerWidth < 700 || window.innerWidth / window.innerHeight < 0.8;
-  let closing = 0;
-
-  /** Switch between the paper in hand and its high-def view. */
-  const setReading = (on: boolean) => {
-    if (on === reading()) return;
-    window.clearTimeout(closing);
-    if (on) {
-      root.dataset.reading = "open";
-      const page = view.querySelector(`[data-page="${VIEW_PAGES[theater?.programView ?? 0]}"]`);
-      view.scrollTop = 0;
-      page?.scrollIntoView({ block: "start" });
-      view.focus({ preventScroll: true });
-    } else if (root.dataset.reading) {
-      root.dataset.reading = "closing";
-      closing = window.setTimeout(() => delete root.dataset.reading, reducedMotion ? 0 : 280);
-    }
-  };
-
   const pickUp = () => {
     if (!theater || theater.mode !== "idle") return;
     write(PROGRAM_KEY, "1");
     theater.pickUp();
-    // On a phone the print is too small to read in hand, so go straight to the high-def view.
-    if (narrow()) window.setTimeout(() => theater?.mode === "program" && setReading(true), reducedMotion ? 0 : 800);
   };
 
-  const putDown = () => {
-    setReading(false);
-    void theater?.putDown();
-  };
+  const putDown = () => void theater?.putDown();
 
   /** Start the film; it opens on this reel. */
   const startFeature = async (reel: Reel) => {
@@ -187,7 +157,6 @@ export function boot() {
       location.assign(reel.path);
       return;
     }
-    setReading(false);
     await theater.putDown();
     theater.start();
   };
@@ -245,35 +214,16 @@ export function boot() {
     if (!theater || (theater.mode !== "idle" && theater.mode !== "program")) return;
     e.preventDefault();
     pickUp();
-    setReading(true);
   });
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
-  document.querySelectorAll("[data-read]").forEach((b) => b.addEventListener("click", () => setReading(true)));
-  document.querySelectorAll("[data-hold]").forEach((b) => b.addEventListener("click", () => setReading(false)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
-
-  // Reels listed in the high-def view start the film there.
-  view.addEventListener("click", (e) => {
-    const link = (e.target as Element).closest<HTMLAnchorElement>("a[data-reel]");
-    const reel = REELS.find((r) => r.id === link?.dataset.reel);
-    if (!link || !reel || !theater) return;
-    e.preventDefault();
-    void startFeature(reel);
-  });
 
   // Keyboard.
   document.addEventListener("keydown", (e) => {
     if (!theater || e.metaKey || e.ctrlKey || e.altKey) return;
     const onControl = e.target instanceof Element && !!e.target.closest("button, a, input, textarea, select");
     const key = e.key.toLowerCase();
-    if (reading()) {
-      if (key === "r") setReading(false);
-      else if (key === "escape") putDown();
-      else return;
-      e.preventDefault();
-      return;
-    }
     switch (theater.mode) {
       case "playing":
         e.preventDefault();
@@ -292,7 +242,6 @@ export function boot() {
         if (key === "escape" || key === "e") putDown();
         else if (key === "arrowleft" || key === "a") theater.turn(-1);
         else if (key === "arrowright" || key === "d") theater.turn(1);
-        else if (key === "r") setReading(true);
         else return;
         e.preventDefault();
         break;

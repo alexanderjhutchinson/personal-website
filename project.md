@@ -133,16 +133,16 @@ The site had three parts that didn't feel like one thing: the room, the resume, 
 - **A game-style prompt points at it:** "[E] Pick up the program" (or "Tap to pick up the program") just above it, and the paper shimmers, until it's been picked up once. After that the prompt shows on hover only.
 - **Picking it up** (click, tap, or E) lifts it off the table and holds it up to the camera while the room dims. It's readable right in the render, like a note in a horror game.
 - **Four pages to turn through** with the arrow keys, the on-screen buttons, or a click on either half: the cover (name and tonight's running order of reels), the inside spread (Experience and Education; Projects and Skills), and the back (Contact).
-- **The high-def view** (R, or "Read") swaps in the same pages as crisp HTML over the dimmed room, with working links and selectable text. On a phone, picking up the program goes straight to it.
+- **No separate reading view.** A high-def HTML view (R) was tried and dropped: the paper in hand is the way to read it. The contact links printed on the back work when clicked.
 - **Escape puts it down.** It stands back up on the table.
 - **The running order on the cover is clickable:** pick a reel and the film starts and opens on that reel.
 - **The opening runs straight into Reel 1** (`/about`) instead of a resume page, and crossfades into it where the browser supports page transitions.
-- **Addresses:** picking up the program makes the address `/program`, and opening `/program` brings the room up with the program in its high-def view. It's the link for someone who only wants the resume. Old `/#resume` links go there.
+- **Addresses:** picking up the program makes the address `/program`, and opening `/program` brings the room up with the program already in hand. It's the link for someone who only wants the resume. Old `/#resume` links go there.
 - **On the reels:** the × in the top-right corner ends the film: the room opens inside the screen and plays the ending. (A link to the program from the reels was tried and dropped: the program belongs in the room.) The reels also get the room's film look: grain, a soft vignette, a faint flicker.
 - **Without WebGL or JavaScript,** the page is just the program.
 - Paper rustle sounds when it's picked up, turned and put down (with sound on).
 
-Checked in the browser at 16:9, square and phone sizes: the prompt, pick up, all three views, the high-def view, putting it down, picking Reel 2 from the cover (the film plays and lands on `/experience`), the program on a reel page, "End the film", the browser back button from a reel, `/program`, and the page without WebGL (simulated). Not tested: Safari and Firefox, real phones, and the page with WebGL actually missing.
+Checked in the browser at 16:9, square and phone sizes: the prompt, pick up, all three views, putting it down, picking Reel 2 from the cover (the film plays and lands on `/experience`), the program on a reel page, "End the film", the browser back button from a reel, `/program`, and the page without WebGL (simulated). Not tested: Safari and Firefox, real phones, and the page with WebGL actually missing.
 
 ---
 

@@ -286,11 +286,6 @@ export class Theater {
     gsap.to(this, { glint: on ? 1 : 0, duration: 0.6 });
   }
 
-  /** Which view of the held program is showing: 0 cover, 1 inside, 2 back. */
-  get programView() {
-    return this.view;
-  }
-
   private quick(seconds: number) {
     return this.opts.reducedMotion ? 0.01 : seconds;
   }
