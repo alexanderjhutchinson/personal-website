@@ -51,10 +51,10 @@ What's in it:
 
 - The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, and film cans labeled Experience, Projects and Photos.
 - A Super 8 projector on the coffee table. Click it (or press Enter) to start the film. The on-screen "Start the film" button was dropped.
-- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, a "Now showing · Feature Presentation" card, then the camera moves into the screen and the feature starts. The card gives nothing away about what's playing; the first reel is the reveal.
+- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, then the screen shows the reel's own pixel scene and the camera moves into it, landing on the same picture, live. No text cards: the reel is the reveal.
 - A short opening for return visits (about 1.8 seconds).
 - Skipping with any click or key.
-- The ending: "The End" card, film runout, the camera pulls back, and the lights come up on the room.
+- The ending: the screen shows the reel that was playing, the film runs out to flickering light, the camera pulls back, and the lights come up on the room. No "The End" card.
 - Film look: grain, gate weave and flicker, heavy during transitions and faint on the resume.
 - Synthesized projector sound, off by default.
 - Phone framing, reduced-motion handling, and a fallback when WebGL is missing.
@@ -87,13 +87,13 @@ Needs your review:
 3. **Beam appears.** Light cuts from the projector to the screen through floating dust.
 4. **Screen flickers white.** Slight frame jitter and scratches.
 5. **Countdown.** A short 3, 2, 1 with the sweeping circle, about 2 seconds.
-6. **Title card.** "Feature Presentation", with nothing about what's playing (it used to show my name), then the view moves forward into the screen and the feature starts.
+6. **The reel on the screen.** The projector shows the first reel's pixel scene (or the reel picked in the program), and the view moves forward into it until the live reel takes over. Title cards (my name, then "Feature Presentation") were tried and dropped: big text that said nothing.
 
 Target length is 3 to 4 seconds. The full version plays on a first visit only, and a click skips it at any point.
 
 ### Ending sequence (first draft)
 
-"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up on the room. (A "Thanks for watching" card with contact links was tried and dropped; contact info lives in the program.)
+The screen picks up the reel that was playing, then the film runs out: flickering white, the tail flapping off the reel, the screen goes dark, and the lights come back up on the room. (A "The End" card and a "Thanks for watching" card were tried and dropped.)
 
 ### The look
 

@@ -1,8 +1,8 @@
 import { COLS, HEIGHT, ROWS, TILE, WIDTH, loadTuning, type Tuning } from "./config";
 import { mountContent } from "./content";
-import { drawDecor } from "./decor";
-import { startGrain } from "./grain";
+import { drawLight, drawSet } from "./draw";
 import { Drop, Dummy, Floater, Particle, burst } from "./entities";
+import { startGrain } from "./grain";
 import { mountHotbar, mountTuning } from "./hud";
 import { Inventory } from "./inventory";
 import { ITEMS } from "./items";
@@ -10,7 +10,7 @@ import { makeCanvas } from "./pixels";
 import { Player, type Controls } from "./player";
 import { SCENES, type ReelScene } from "./scenes";
 import { Sfx } from "./sfx";
-import { Tile, TILES, drawCracks, drawTile, drawWall } from "./tiles";
+import { Tile, TILES } from "./tiles";
 import { World } from "./world";
 import { REELS, type Reel } from "../data";
 import { person } from "../data/profile";
@@ -313,6 +313,8 @@ export function startLobby() {
   const renderReel = () => {
     const { reel } = here;
     document.title = `${reel.title} · ${person.name}`;
+    // The × ends the film on whichever reel is playing.
+    document.getElementById("end-film")?.setAttribute("href", `/?end=${reel.id}`);
     canvas.setAttribute("aria-label", `Reel ${reel.number}, ${reel.title}. ${scene.alt}`);
     for (const panel of panels) panel.hidden = panel.dataset.reelPanel !== reel.id;
     for (const [button, target] of [
@@ -465,64 +467,17 @@ export function startLobby() {
     world.updateLight();
   };
 
-  const clouds = [
-    { x: 40, y: 22, w: 26 },
-    { x: 170, y: 36, w: 34 },
-    { x: 260, y: 16, w: 20 },
-  ];
-
   const render = () => {
     ctx.save();
     if (shake > 0) ctx.translate(Math.round((Math.random() - 0.5) * 2), Math.round((Math.random() - 0.5) * 2));
-    ctx.drawImage(here.backdrop, 0, 0);
-
-    if (scene.clouds) {
-      const [color, shade] = scene.clouds;
-      for (const cl of clouds) {
-        const x = Math.round(((cl.x + time * 2.5) % (WIDTH + 60)) - 30);
-        ctx.fillStyle = color;
-        ctx.fillRect(x, cl.y, cl.w, 3);
-        ctx.fillRect(x + 4, cl.y - 2, cl.w - 10, 2);
-        ctx.fillStyle = shade;
-        ctx.fillRect(x + 2, cl.y + 3, cl.w - 4, 1);
-      }
-    }
-
-    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) drawWall(ctx, world.bg(x, y), x, y);
-    for (const d of scene.decor) drawDecor(ctx, d, time);
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        drawTile(ctx, world, x, y, time);
-        const ratio = world.damageRatio(x, y, time);
-        if (ratio > 0) drawCracks(ctx, x, y, ratio);
-      }
-    }
+    drawSet(ctx, world, scene, here.backdrop, time);
 
     dummy?.draw(ctx);
     for (const d of drops) d.draw(ctx, time);
     player.draw(ctx);
     for (const p of particles) p.draw(ctx);
 
-    // Soft lighting: the tile light map scaled up with smoothing.
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(world.lightCanvas, 0, 0, WIDTH, HEIGHT);
-    ctx.imageSmoothingEnabled = false;
-
-    // Warm glow around torches and anything else that burns.
-    ctx.globalCompositeOperation = "lighter";
-    const glow = (x: number, y: number) => {
-      const cx = x * TILE + 4;
-      const cy = y * TILE + 2;
-      const flicker = 0.85 + Math.sin(time * 9 + x) * 0.08 + Math.sin(time * 23 + y) * 0.05;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * flicker);
-      g.addColorStop(0, "rgba(255, 170, 80, 0.28)");
-      g.addColorStop(1, "rgba(255, 120, 40, 0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - 30, cy - 30, 60, 60);
-    };
-    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (world.fg(x, y) === Tile.Torch) glow(x, y);
-    for (const [x, y] of scene.glows) glow(x, y);
-    ctx.globalCompositeOperation = "source-over";
+    drawLight(ctx, world, scene, time);
 
     for (const f of floaters) f.draw(ctx);
 

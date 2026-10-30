@@ -57,7 +57,9 @@ export function boot() {
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const openProgram = stage.dataset.open === "program";
-  const playEnding = new URLSearchParams(location.search).has("end");
+  // A reel's × links here with ?end=<reel>: the room opens inside the screen on that reel and plays the ending.
+  const endParam = new URLSearchParams(location.search).get("end");
+  const endingOn = endParam === null ? null : (REELS.find((r) => r.id === endParam) ?? REELS[0]);
   const setPageMode = (mode: PageMode) => {
     root.dataset.mode = mode;
   };
@@ -94,10 +96,10 @@ export function boot() {
         t.sound.setEnabled(soundOn);
         theater = t;
         delete root.dataset.loading;
-        if (playEnding) {
+        if (endingOn) {
           history.replaceState(null, "", "/");
           t.assumeEntered();
-          t.end();
+          t.end(endingOn.id);
         } else if (openProgram) {
           pickUp();
           setReading(true);
@@ -187,7 +189,7 @@ export function boot() {
     }
     setReading(false);
     await theater.putDown();
-    theater.start();
+    theater.start(reel.id);
   };
 
   const follow = (action: RegionAction) => {

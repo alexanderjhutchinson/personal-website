@@ -5,6 +5,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
+import type { ReelId } from "../data";
+import { paintReelStill } from "../lobby/still";
 import { buildBeam, buildRoomDust, type Beam } from "./beam";
 import { COUNT_STEP, Film } from "./film";
 import { createFilmPass } from "./filmPass";
@@ -367,9 +369,10 @@ export class Theater {
     this.startLoop();
   }
 
-  /** Run the opening: full on a first visit, short after that. */
-  start() {
+  /** Run the opening: full on a first visit, short after that. The screen ends on this reel's opening frame. */
+  start(reel: ReelId = "about") {
     if (this.mode !== "idle") return;
+    this.film.show(paintReelStill(reel));
     if (this.opts.reducedMotion) {
       this.enterQuick();
       return;
@@ -402,7 +405,7 @@ export class Theater {
       tl.to(s, { ...FILM_LOOK, duration: 0.4 }, 0.35);
       tl.call(() => this.film.set("countdown"), [], 0.95);
       tl.call(() => this.sound.pop(), [], 0.95 + COUNT_STEP);
-      tl.call(() => this.film.set("title"), [], 0.95 + COUNT_STEP * 3);
+      tl.call(() => this.film.set("reel"), [], 0.95 + COUNT_STEP * 3);
       tl.to(s, { cam: 1, duration: 1.25, ease: "power2.inOut" }, 2.95);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 1.0 }, 3.0);
       tl.call(() => this.beginCrossfade(), [], 3.8);
@@ -415,7 +418,7 @@ export class Theater {
       tl.call(() => this.film.set("leader"), [], 0.15);
       tl.to(s, { beam: 1, screen: 1, duration: 0.2 }, 0.15);
       tl.to(s, { ...FILM_LOOK, duration: 0.3 }, 0.15);
-      tl.call(() => this.film.set("title"), [], 0.5);
+      tl.call(() => this.film.set("reel"), [], 0.5);
       tl.to(s, { cam: 1, duration: 1.05, ease: "power2.inOut" }, 0.55);
       tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 0.8 }, 0.6);
       tl.call(() => this.beginCrossfade(), [], 1.35);
@@ -436,7 +439,7 @@ export class Theater {
     if (this.mode !== "playing") return;
     this.tl?.kill();
     this.tl = null;
-    this.film.set("title");
+    this.film.set("reel");
     gsap.to(this.state, { beam: 1, screen: 1, lamp: 0.035, running: 1, duration: 0.2 });
     this.beginCrossfade();
     window.setTimeout(() => this.finishEnter(), 450);
@@ -451,13 +454,14 @@ export class Theater {
     window.setTimeout(() => this.finishEnter(), 450);
   }
 
-  /** Run the ending: "The End", the film runs out, the camera pulls back, the lights come up. */
-  end() {
+  /** Run the ending: the screen shows the reel that was playing, the film runs out, the camera pulls back, the lights come up. */
+  end(reel: ReelId = "about") {
     if (this.mode !== "entered") return;
     const s = this.state;
     this.tl?.kill();
     Object.assign(s, { cam: 1, lamp: 0.035, beam: 1, screen: 1, running: 1, reels: 1, ...FILM_LOOK, fade: 0 });
-    this.film.set("end");
+    this.film.show(paintReelStill(reel));
+    this.film.set("reel");
     this.setMode("ending");
     this.startLoop();
 
@@ -474,14 +478,14 @@ export class Theater {
     tl.call(() => {
       this.film.set("runout");
       this.sound.runout(1.2);
-    }, [], 1.5);
-    tl.to(s, { cam: 0, duration: 1.4, ease: "power2.inOut" }, 1.6);
-    tl.to(s, { beam: 0, screen: 0, running: 0, duration: 0.35, ease: "power1.in" }, 2.45);
-    tl.call(() => this.film.set("dark"), [], 2.8);
-    tl.call(() => this.sound.stopMotor(1.1), [], 2.45);
-    tl.to(s, { reels: 0, duration: 1.1, ease: "power2.out" }, 2.45);
-    tl.to(s, { lamp: 1, duration: 0.9, ease: "power1.inOut" }, 2.8);
-    tl.to(s, { ...IDLE_LOOK, duration: 0.8 }, 2.8);
+    }, [], 0.7);
+    tl.to(s, { cam: 0, duration: 1.4, ease: "power2.inOut" }, 0.8);
+    tl.to(s, { beam: 0, screen: 0, running: 0, duration: 0.35, ease: "power1.in" }, 1.65);
+    tl.call(() => this.film.set("dark"), [], 2.0);
+    tl.call(() => this.sound.stopMotor(1.1), [], 1.65);
+    tl.to(s, { reels: 0, duration: 1.1, ease: "power2.out" }, 1.65);
+    tl.to(s, { lamp: 1, duration: 0.9, ease: "power1.inOut" }, 2.0);
+    tl.to(s, { ...IDLE_LOOK, duration: 0.8 }, 2.0);
   }
 
   private beginCrossfade() {

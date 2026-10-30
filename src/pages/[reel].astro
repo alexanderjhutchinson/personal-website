@@ -80,7 +80,7 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     </noscript>
 
     <!-- Ends the film: the room opens inside the screen and plays the ending. -->
-    <a class="end-film" href="/?end" aria-label="End the film" title="End the film">
+    <a id="end-film" class="end-film" href={`/?end=${reel.id}`} aria-label="End the film" title="End the film">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">
         <path d="M6 6l12 12M18 6L6 18"></path>
       </svg>

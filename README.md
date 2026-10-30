@@ -38,7 +38,7 @@ Then open http://localhost:4321.
 | `src/scene/program.ts` | The program on the coffee table: a folded sheet that opens and turns over. |
 | `src/scene/programPages.ts` | Paints the program's four pages, and where the reels and links on them are. |
 | `src/scene/beam.ts` | The projector beam and the dust in it and around the lamp. |
-| `src/scene/film.ts` | What's on the screen: leader, countdown, the "Feature Presentation" card, "The End", film damage. |
+| `src/scene/film.ts` | What's on the screen: leader, countdown, a still of a reel, the film running out, film damage. |
 | `src/scene/filmPass.ts` | Full-frame film look: grain, gate weave, flicker, vignette. |
 | `src/scene/sound.ts` | Projector sounds, synthesized with Web Audio. |
 | `src/scene/textures.ts` | Every surface texture, painted on canvases at load time. |
@@ -50,16 +50,18 @@ Then open http://localhost:4321.
 | `src/lobby/player.ts` | Movement, jumping, wandering, and walking to a door. |
 | `src/lobby/content.ts` | Pixel icons for content items, and the item card. |
 | `src/lobby/decor.ts` | Props: signs, workbench, anvil, furnace, chest, mine cart. |
+| `src/lobby/draw.ts` | Draws a reel's scene: sky, walls, props, blocks, and light. |
+| `src/lobby/still.ts` | A reel's opening frame as a picture, for the room's projector to show. |
 
 ## How it behaves
 
 - **The program:** stands on the coffee table. A game-style prompt ("E Pick up the program") sits over it until it's been picked up once, and it shimmers. Click it or press E to pick it up. Arrow keys (or clicking either half) turn it: cover, inside spread, back. R switches to the high-def view; Escape puts it down. On a phone it goes straight to the high-def view.
-- **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. The opening ends on Reel 1 (`/about`). A reel picked in the program is the one it opens on.
+- **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen shows the reel's pixel scene and the camera moves into it, landing on the live reel: Reel 1 (`/about`), or the one picked in the program. No title cards.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
 - **No WebGL or no JavaScript:** the program shows on its own.
-- **Addresses:** `/program` opens the room with the program picked up and in its high-def view; it's the link for someone who wants the resume. Old `/#resume` links go there. The × in a reel's top-right corner ends the film: the room opens inside the screen (`/?end`) and plays the ending.
+- **Addresses:** `/program` opens the room with the program picked up and in its high-def view; it's the link for someone who wants the resume. Old `/#resume` links go there. The × in a reel's top-right corner ends the film: the room opens inside the screen on that reel (`/?end=experience`), then the film runs out and the lights come up.
 
 On the reels:
 
