@@ -6,9 +6,10 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 
 - **Phase 1 (the living room) is built** and merged into `main` (#1).
 - **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. Merged into `main` (#2).
-- **Everything is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
+- **The room, the program and the feature are tied together** on branch `program-paper` (see "The program" below): the resume is a folded program on the coffee table, and the opening runs straight into Reel 1.
+- **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Nothing is deployed yet.**
-- **Next:** connect the room's opening to Reel 1, then the rest of "Phase 2: next up".
+- **Next:** see "Phase 2: next up".
 
 ## Why it matters
 
@@ -49,8 +50,8 @@ Decided: a 3D room drawn entirely in code, set in the 1970s, ending on a stopgap
 What's in it:
 
 - The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, and film cans labeled Experience, Projects and Photos.
-- A Super 8 projector on the coffee table. Click it or the "Start the film" button.
-- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, a title card, then the camera moves into the screen and crossfades to the resume.
+- A Super 8 projector on the coffee table. Click it (or press Enter) to start the film. The on-screen "Start the film" button was dropped.
+- The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, a "Now showing · Feature Presentation" card, then the camera moves into the screen and the feature starts. The card gives nothing away about what's playing; the first reel is the reveal.
 - A short opening for return visits (about 1.8 seconds).
 - Skipping with any click or key.
 - The ending: "The End" card, film runout, the camera pulls back, and the lights come up on the room.
@@ -62,13 +63,13 @@ Needs your review:
 
 - [ ] **Listen to the sound.** I confirmed it runs without errors but couldn't hear it.
 - [x] **Swapped in the June 2026 resume content** (see the appendix). The resume page is now "the program" and shows experience, projects, education and skills, with no bullets.
-- [ ] **The About copy is from 2023** and needs a rewrite.
+- [x] **The 2023 About copy is off the site.** It's dropped from the program; the old text is in the appendix if a rewrite is wanted.
 - [ ] **Placeholder posters.** "The Late Show" and "Double Feature" are original placeholders. Swap in your own picks.
-- [ ] **Reloading after the film opens the resume directly** (the URL becomes `/#resume`). Good for sharing a link, but returning visitors only see the room again via "End the film".
+- [x] **The opening no longer ends on the resume.** It runs into Reel 1, and the resume is the program on the coffee table (see "The program").
 - [ ] **Not yet tested:**
   - real phones, Safari and Firefox (only Chromium was tested)
   - the reduced-motion path, which I checked by reading the code but couldn't switch on in the test browser
-- [ ] **Page weight.** The 3D scene is about 300 KB gzipped. It loads after the page, so the resume text is never blocked, but the room takes a moment on slow connections.
+- [ ] **Page weight.** The 3D scene is about 300 KB gzipped. It loads after the page, so the program's text is never blocked, but the room takes a moment on slow connections.
 - [ ] **Not deployed.** Hosting needs your accounts.
 - [ ] **`npm audit` flags two advisories** in build tooling (`undici`, `fast-uri`). Neither ships to the browser. I pinned installs to versions at least two weeks old, and `npm audit fix` would pull newer ones.
 
@@ -86,13 +87,13 @@ Needs your review:
 3. **Beam appears.** Light cuts from the projector to the screen through floating dust.
 4. **Screen flickers white.** Slight frame jitter and scratches.
 5. **Countdown.** A short 3, 2, 1 with the sweeping circle, about 2 seconds.
-6. **Title card.** My name, then the view moves forward into the screen and the film becomes the page.
+6. **Title card.** "Feature Presentation", with nothing about what's playing (it used to show my name), then the view moves forward into the screen and the feature starts.
 
 Target length is 3 to 4 seconds. The full version plays on a first visit only, and a click skips it at any point.
 
 ### Ending sequence (first draft)
 
-"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up on the room. (A "Thanks for watching" card with contact links was tried and dropped; contact info lives on the resume.)
+"The End" card, the film tail flapping off the reel, the screen goes white then dark, and the lights come back up on the room. (A "Thanks for watching" card with contact links was tried and dropped; contact info lives in the program.)
 
 ### The look
 
@@ -103,7 +104,7 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 
 ### Controls
 
-- Landing: click the projector, or press Enter/Space. A small hint shows how.
+- Landing: click the projector, press Enter/Space, or pick a reel in the program. No on-screen start button; the program's prompt is the only hint.
 - Skip: any click during the sequence.
 - Sound: off until the visitor turns it on (browsers block autoplay anyway). The motor sound is the best part, so the "sound on" control should be easy to find.
 
@@ -118,7 +119,30 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 - [x] How is the room drawn? **3D scene**, built in code with three.js. Models made in Blender can replace pieces later.
 - [x] Which decade is the room? **The 1970s.**
 - [ ] How long can the opening run before it feels in the way? Currently about 4.2 seconds the first time and 1.8 after. Watch it a few times and decide.
-- [x] What's on the screen at the end of phase 1, before phase 2 exists? **A stopgap resume page**, styled as projected light with silent-film title cards.
+- [x] What's on the screen at the end of phase 1? **The feature's first reel.** (At first it was a stopgap resume page; that became the program on the coffee table.)
+
+---
+
+## The program: tying the room, the resume and the feature together
+
+The site had three parts that didn't feel like one thing: the room, the resume, and the reels. The fix: the resume is a printed program sitting in the room, and the room's film is the feature.
+
+### Status: built (branch `program-paper`)
+
+- **A folded program stands on the coffee table,** half open like a greeting card, between the film cans and the projector. Same design as before (cream paper, title-card type, diamond ornaments), painted in code.
+- **A game-style prompt points at it:** "[E] Pick up the program" (or "Tap to pick up the program") just above it, and the paper shimmers, until it's been picked up once. After that the prompt shows on hover only.
+- **Picking it up** (click, tap, or E) lifts it off the table and holds it up to the camera while the room dims. It's readable right in the render, like a note in a horror game.
+- **Four pages to turn through** with the arrow keys, the on-screen buttons, or a click on either half: the cover (name and tonight's running order of reels), the inside spread (Experience and Education; Projects and Skills), and the back (Contact).
+- **The high-def view** (R, or "Read") swaps in the same pages as crisp HTML over the dimmed room, with working links and selectable text. On a phone, picking up the program goes straight to it.
+- **Escape puts it down.** It stands back up on the table.
+- **The running order on the cover is clickable:** pick a reel and the film starts and opens on that reel.
+- **The opening runs straight into Reel 1** (`/about`) instead of a resume page, and crossfades into it where the browser supports page transitions.
+- **Addresses:** picking up the program makes the address `/program`, and opening `/program` brings the room up with the program in its high-def view. It's the link for someone who only wants the resume. Old `/#resume` links go there.
+- **On the reels:** the × in the top-right corner ends the film: the room opens inside the screen and plays the ending. (A link to the program from the reels was tried and dropped: the program belongs in the room.) The reels also get the room's film look: grain, a soft vignette, a faint flicker.
+- **Without WebGL or JavaScript,** the page is just the program.
+- Paper rustle sounds when it's picked up, turned and put down (with sound on).
+
+Checked in the browser at 16:9, square and phone sizes: the prompt, pick up, all three views, the high-def view, putting it down, picking Reel 2 from the cover (the film plays and lands on `/experience`), the program on a reel page, "End the film", the browser back button from a reel, `/program`, and the page without WebGL (simulated). Not tested: Safari and Firefox, real phones, and the page with WebGL actually missing.
 
 ---
 
@@ -135,7 +159,7 @@ Target length is 3 to 4 seconds. The full version plays on a first visit only, a
 - **Content is data.** Adding a job or project should be one file, and layouts should handle any number of them.
 - **Projects go in the feature,** as Reel 3, not on a film can.
 - **Content source for now:** the June 2026 resume (appendix), without bullets.
-- **How Phase 1 leads into Phase 2:** the opening ends on Reel 1 instead of the resume. The film cans on the coffee table become clickable and play their home movie. The current resume page becomes the "Program", the plain-text fast path for recruiters.
+- **How Phase 1 leads into Phase 2:** the opening ends on Reel 1 instead of the resume (done). The film cans on the coffee table become clickable and play their home movie. The resume becomes the program, a paper on the coffee table (done, see "The program").
 - **Still open:** what item name color means (type, recency, or impact; the reels use type for now: school, work, project), and what the Hobbies and Photos home movies show.
 
 ### Status: three reels built (merged in #2)
@@ -166,27 +190,25 @@ Content:
 - Clicking an item opens its card (Escape, the Close button, or a click outside closes it). The card's address is shareable, like `/projects#speakeasy`.
 - Name colors follow the type (the leaning from "Still open"): blue for school, gold for work, green for projects.
 - Each item has its own pixel icon (turbine, briefcase, leaf, server, speech bubble, gamepad, diploma, toolbox, envelope).
-- "The program" link under every reel goes to the plain resume at `/#resume`, whose footer links to all three reels.
+- The reels keep the screen clean: no key guide, no program link, and no tuning button. Visitors work out the controls themselves. Sound is a speaker button in the frame's bottom-left corner, beside the left door.
 
 Checked: reel switching both ways, door walk-outs (including from inside the house over the hills), back and forward, cards, the build, and layouts at desktop and phone width. The roll was checked frame by frame rather than watched at full speed, because the test browser pauses animation when its pane is hidden. Watch it once in a real browser.
 
 Not done yet:
 
-- The room's opening still ends on the program, not Reel 1, so the reels are only reachable from the program's links or by address.
 - The cards hold only what the resume has. They're the place for write-ups, links and screenshots later.
-- The tuning panel's values haven't been tuned. The first lobby frame's notes still apply: run `/about?tune` or press `` ` `` in dev.
+- The tuning panel's values haven't been tuned. The panel is development-only now: press `` ` `` with `npm run dev` running.
 
 ### Phase 2: next up
 
 In rough order:
 
-1. **Connect the room:** the opening ends on Reel 1 instead of the program, and "End the film" works from any reel (a door before Reel 1 or after Reel 3 could lead back to the room).
-2. **Phone controls:** tap a spot to walk there and tap a door to change reels. The door buttons already work by touch.
-3. **Write-ups on the cards:** a line in your own voice per item, links (GitHub, demos), and later screenshots.
-4. **Clickable film cans:** home movies for Photos (a slide projector) and Hobbies.
-5. **Tune the feel** in the tuning panel, then copy the values into `DEFAULT_TUNING`.
-6. **Scene polish:** more props, and a reason to use the tools on each reel (ore in the mine, crafting at the workbench).
-7. **Later:** the live data (time of day, weather, the radio) and extra lobby fun (critters, a boss).
+1. **Phone controls:** tap a spot to walk there and tap a door to change reels. The door buttons already work by touch.
+2. **Write-ups on the cards:** a line in your own voice per item, links (GitHub, demos), and later screenshots.
+3. **Clickable film cans:** home movies for Photos (a slide projector) and Hobbies.
+4. **Tune the feel** in the tuning panel, then copy the values into `DEFAULT_TUNING`.
+5. **Scene polish:** more props, and a reason to use the tools on each reel (ore in the mine, crafting at the workbench).
+6. **Later:** the live data (time of day, weather, the radio) and extra lobby fun (critters, a boss).
 
 ### Earlier ideas
 
@@ -227,7 +249,7 @@ In rough order:
 
 ### How phase 1 and 2 connect
 
-Decided (see "Decided" above): the opening ends on Reel 1, and the film cans play home movies. Not wired up yet: the reels exist, but the opening still ends on the program.
+Decided (see "Decided" above): the opening ends on Reel 1 (built), the resume is the program on the coffee table (built), and the film cans play home movies (not yet).
 
 ---
 

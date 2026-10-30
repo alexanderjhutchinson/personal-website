@@ -1,6 +1,7 @@
 import { COLS, HEIGHT, ROWS, TILE, WIDTH, loadTuning, type Tuning } from "./config";
 import { mountContent } from "./content";
 import { drawDecor } from "./decor";
+import { startGrain } from "./grain";
 import { Drop, Dummy, Floater, Particle, burst } from "./entities";
 import { mountHotbar, mountTuning } from "./hud";
 import { Inventory } from "./inventory";
@@ -54,7 +55,6 @@ export function startLobby() {
   const tooltip = document.getElementById("tooltip");
   const label = document.getElementById("item-label");
   const tuningPanel = document.getElementById("tuning");
-  const tuneButton = document.getElementById("tune-toggle");
   const soundButton = document.getElementById("lobby-sound");
   const stage = document.getElementById("stage");
   const prevButton = document.getElementById("door-prev");
@@ -66,7 +66,9 @@ export function startLobby() {
 
   const tuning = loadTuning();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  const content = mountContent();
+  mountContent();
+  const grain = document.getElementById("reel-grain");
+  if (grain instanceof HTMLCanvasElement) startGrain(grain, reduceMotion.matches);
 
   const states = new Map<Reel["id"], ReelState>();
   const stateFor = (reel: Reel) => {
@@ -114,14 +116,11 @@ export function startLobby() {
     floaters = [];
     stockInventory();
   };
-  mountTuning(tuningPanel, tuning, resetScene);
-  const showTuning = import.meta.env.DEV || new URLSearchParams(location.search).has("tune");
-  if (tuneButton) tuneButton.hidden = !showTuning;
+  // The tuning panel is for development only: press ` to show it.
+  if (import.meta.env.DEV) mountTuning(tuningPanel, tuning, resetScene);
   const toggleTuning = () => {
-    if (!showTuning) return;
-    tuningPanel.hidden = !tuningPanel.hidden;
+    if (import.meta.env.DEV) tuningPanel.hidden = !tuningPanel.hidden;
   };
-  tuneButton?.addEventListener("click", toggleTuning);
 
   // Sound shares the preference with the living room.
   const sfx = new Sfx();
@@ -131,11 +130,7 @@ export function startLobby() {
   } catch {
     // Sound stays off.
   }
-  const renderSound = () => {
-    soundButton?.setAttribute("aria-pressed", String(soundOn));
-    const text = soundButton?.querySelector("[data-label]");
-    if (text) text.textContent = soundOn ? "Sound on" : "Sound off";
-  };
+  const renderSound = () => soundButton?.setAttribute("aria-pressed", String(soundOn));
   renderSound();
   soundButton?.addEventListener("click", () => {
     soundOn = !soundOn;
@@ -156,7 +151,8 @@ export function startLobby() {
   const GAME_KEYS = new Set(["KeyA", "KeyD", "KeyW", "KeyS", "Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 
   window.addEventListener("keydown", (e) => {
-    if (e.target instanceof HTMLInputElement || content.isOpen()) return;
+    // Item cards and the program are dialogs; the game ignores keys while one is open.
+    if (e.target instanceof HTMLInputElement || document.querySelector("dialog[open]")) return;
     // Space and Enter press a button that has keyboard focus instead of jumping.
     const focused = e.target instanceof HTMLElement && e.target.matches("button:focus-visible, a:focus-visible");
     if (focused && (e.code === "Space" || e.code === "Enter")) return;
@@ -566,7 +562,7 @@ export function startLobby() {
   // Scale the frame to fit, using whole-pixel multiples when there's room.
   const resize = () => {
     const availW = document.documentElement.clientWidth - 32;
-    const availH = window.innerHeight - 140;
+    const availH = window.innerHeight - 100;
     let s = Math.min(availW / WIDTH, availH / HEIGHT);
     if (s >= 2) s = Math.floor(s);
     s = Math.max(s, 0.5);

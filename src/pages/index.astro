@@ -1,5 +1,5 @@
 ---
-import Resume from "../components/Resume.astro";
+import ProgramView from "../components/ProgramView.astro";
 import Stage from "../components/Stage.astro";
 import { person } from "../data/profile";
 import Base from "../layouts/Base.astro";
@@ -10,7 +10,7 @@ import Base from "../layouts/Base.astro";
   description={`${person.name}: ${person.program} at the ${person.school}, and ${person.role.toLowerCase()}.`}
 >
   <Stage />
-  <Resume />
+  <ProgramView />
 </Base>
 
 <script>

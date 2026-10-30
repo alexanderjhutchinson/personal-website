@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { person } from "../data/profile";
 import { SCREEN } from "./layout";
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from "./textures";
 
@@ -153,7 +152,8 @@ export class Film {
         light = true;
         break;
       case "title":
-        this.drawTitleCard(person.name, `${person.program} · ${person.school}`, "Reel one");
+        // Nothing about what's playing: the feature itself is the reveal.
+        this.drawTitleCard("Feature Presentation", "", "Now showing");
         break;
       case "end":
         this.drawTitleCard("The End", "Thanks for watching", "Fin");
