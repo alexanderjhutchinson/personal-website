@@ -8,5 +8,15 @@
     // Every address is written without a trailing slash (/about, /program),
     // so serve /about from about/index.html and send /about/ to /about.
     "html_handling": "drop-trailing-slash"
-  }
+  },
+  // Each deploy makes the Worker's domains match this list, so add or remove
+  // them here; a change made only in the dashboard is undone on the next deploy.
+  "routes": [
+    { "pattern": "alexanderjhutchinson.com", "custom_domain": true },
+    { "pattern": "www.alexanderjhutchinson.com", "custom_domain": true }
+  ],
+  // With domains listed, Wrangler would turn these off. Keep the workers.dev
+  // address and the per-branch preview links.
+  "workers_dev": true,
+  "preview_urls": true
 }
