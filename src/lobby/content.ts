@@ -185,7 +185,7 @@ function iconUrl(kind: IconKind) {
  * into the page by Astro. This fills in their pixel icons and opens a card
  * when an item is clicked, here or in the panel drawn on the reel.
  */
-export function mountContent() {
+export function mountContent(onOpen?: (key: string) => void) {
   for (const el of document.querySelectorAll<HTMLElement>("[data-icon]")) {
     const kind = el.dataset.icon as IconKind;
     if (!(kind in ICONS) || el.querySelector("img")) continue;
@@ -204,6 +204,7 @@ export function mountContent() {
     for (const card of cards) card.hidden = card.dataset.card !== key;
     if (!dialog.open) dialog.showModal();
     history.replaceState(history.state, "", `#${key.split("/")[1]}`);
+    onOpen?.(key);
   };
 
   document.addEventListener("click", (e) => {

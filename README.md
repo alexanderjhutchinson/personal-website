@@ -74,7 +74,7 @@ On the reels:
 - **Changing reels:** walk out the door at the edge of the scene, or press a door button at the bottom, which runs the character out that door. The film rolls to the next frame and the character walks in the other side. Pressing the button again cuts straight away.
 - **Addresses:** each reel has its own address, and the back button moves between reels. `/projects#speakeasy` opens that item's card.
 - **On the screen:** the game plays as the screen's own picture in 3D, so the plant stays in front of it and the beam and dust cross it. Its interface is part of the picture: the hotbar, tooltips, the item panel at the top right, and the reel's title card. Clicks go through the screen into the game.
-- **Content:** click an item in the panel for its card, printed on the same cream paper as the program. Name colors mean the type: burnt orange for school, amber for work, avocado for projects.
+- **Content:** click an item in the panel for its card, printed on the same cream paper as the program. Like the program on the table, each reel's panel points itself out (a pulsing amber border and "Click an item to read more") until one of its items has been hovered or opened; that's remembered per reel. Name colors mean the type: burnt orange for school, amber for work, avocado for projects.
 - **Around the screen:** the room's own controls, in its amber and cream: sound and the × in the top-right corner, and the door buttons in the bottom corners (next reel bottom right). No key guide; visitors work the controls out.
 - **Tuning:** the feel can only be tuned in development: press `` ` `` with `npm run dev` running.
 - **The film look:** the room's own grain and vignette fall on the screen with everything else.

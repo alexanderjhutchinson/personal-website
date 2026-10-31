@@ -46,6 +46,8 @@ const NAME_LINE = 7.2;
 const SUB_LINE = 5.6;
 /** Seconds the panel glows after a new reel starts, to point out that the content changed. */
 const GLOW_TIME = 3.5;
+/** The note under a panel nobody has looked at yet waits for the title card to clear first. */
+const PROMPT_DELAY = 2.2;
 
 function spaced(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, align: "left" | "center") {
   const chars = [...text];
@@ -82,6 +84,7 @@ export class Overlay {
   private entries: { box: Box; key: string }[] = [];
   private panel: Box | null = null;
   private title: { reel: Reel; start: number } | null = null;
+  private touch = matchMedia("(hover: none)").matches;
 
   constructor(inv: Inventory) {
     this.inv = inv;
@@ -104,12 +107,15 @@ export class Overlay {
     return !!this.at(x, y) || (!!this.panel && within(this.panel, x, y));
   }
 
-  /** Draw onto a picture SCALE times the game's size. */
-  draw(ctx: CanvasRenderingContext2D, reel: Reel, now: number) {
+  /**
+   * Draw onto a picture SCALE times the game's size. `fresh` means none of this reel's items have been
+   * looked at yet: the panel then pulses and points itself out, like the program on the table.
+   */
+  draw(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean) {
     ctx.save();
     ctx.scale(SCALE, SCALE);
     ctx.textBaseline = "alphabetic";
-    this.drawPanel(ctx, reel, now);
+    this.drawPanel(ctx, reel, now, fresh);
     this.drawHotbar(ctx);
     this.drawTooltip(ctx);
     this.drawTitle(ctx, now);
@@ -188,7 +194,7 @@ export class Overlay {
   }
 
   /** The reel's items, in the room's style: a dark card with a double rule, a title-card heading, and the items. */
-  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel, now: number) {
+  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean) {
     const items = reelItems[reel.id];
     const textX = PANEL_X + PANEL_PAD + ENTRY_ICON + 5;
     const textW = PANEL_X + PANEL_W - PANEL_PAD - textX;
@@ -207,9 +213,11 @@ export class Overlay {
     const height = PANEL_PAD + headH + rows.reduce((n, r) => n + r.h + 2, 0) + PANEL_PAD - 2;
     this.panel = { x: PANEL_X, y: top, w: PANEL_W, h: height };
 
-    // For a few seconds after a reel starts, the panel glows amber.
+    // For a few seconds after a reel starts the panel glows amber; until one of its items has been
+    // looked at, it keeps pulsing.
     const since = this.title?.reel.id === reel.id ? now - this.title.start : Infinity;
-    const glow = since < GLOW_TIME ? (1 - since / GLOW_TIME) * (0.6 + 0.4 * Math.sin(since * 7)) : 0;
+    const start = since < GLOW_TIME ? (1 - since / GLOW_TIME) * (0.6 + 0.4 * Math.sin(since * 7)) : 0;
+    const glow = Math.max(start, fresh ? 0.35 + 0.3 * Math.sin(now * 3) : 0);
     ctx.shadowColor = `rgba(224, 163, 58, ${0.7 * glow})`;
     ctx.shadowBlur = 10 * SCALE * glow;
     ctx.fillStyle = PANEL_BG;
@@ -221,6 +229,8 @@ export class Overlay {
     ctx.lineWidth = 0.35;
     ctx.strokeStyle = "rgba(224, 163, 58, 0.3)";
     ctx.strokeRect(PANEL_X + 1.8, top + 1.8, PANEL_W - 3.6, height - 3.6);
+
+    if (fresh) this.drawPrompt(ctx, top + height, since);
 
     ctx.fillStyle = AMBER;
     ctx.font = `500 4.3px ${MONO}`;
@@ -265,6 +275,26 @@ export class Overlay {
       }
       y += row.h + 2;
     }
+  }
+
+  /** A note under the panel, like the program's pick-up prompt: there's more to read here. */
+  private drawPrompt(ctx: CanvasRenderingContext2D, y: number, since: number) {
+    const alpha = since === Infinity ? 1 : Math.min(1, Math.max(0, (since - PROMPT_DELAY) / 0.4));
+    if (alpha <= 0) return;
+    const text = this.touch ? "Tap an item to read more" : "Click an item to read more";
+    ctx.font = `500 4.4px ${MONO}`;
+    const w = ctx.measureText(text).width + 9;
+    const x = PANEL_X + PANEL_W - w;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "rgba(15, 11, 8, 0.86)";
+    ctx.fillRect(x, y + 3, w, 9);
+    ctx.lineWidth = 0.4;
+    ctx.strokeStyle = AMBER;
+    ctx.strokeRect(x + 0.2, y + 3.2, w - 0.4, 8.6);
+    ctx.fillStyle = INK;
+    ctx.textAlign = "left";
+    ctx.fillText(text, x + 4.5, y + 9.1);
+    ctx.globalAlpha = 1;
   }
 
   /** The reel's name as a title card: fades in, holds, fades out. */

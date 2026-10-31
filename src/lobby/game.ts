@@ -87,7 +87,25 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
 
   const tuning = loadTuning();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  const content = mountContent();
+  // Each reel's item panel points itself out until one of its items has been looked at (hovered or
+  // opened), like the program on the table. Remembered across visits.
+  const READ_KEY = "movie-night:read-reels";
+  const readReels = new Set<string>();
+  try {
+    for (const id of JSON.parse(localStorage.getItem(READ_KEY) ?? "[]")) readReels.add(String(id));
+  } catch {
+    // Nothing remembered: every panel points itself out.
+  }
+  const markRead = (id: string) => {
+    if (readReels.has(id)) return;
+    readReels.add(id);
+    try {
+      localStorage.setItem(READ_KEY, JSON.stringify([...readReels]));
+    } catch {
+      // Not remembered, still applies for this visit.
+    }
+  };
+  const content = mountContent((key) => markRead(key.split("/")[0]));
 
   // The picture the room projects: the scene, scaled up with crisp pixels, and the interface drawn sharp on top.
   const { c: picture, ctx: pctx } = makeCanvas(WIDTH * SCALE, HEIGHT * SCALE);
@@ -222,6 +240,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     mouse.y = y;
     mouse.inside = true;
     overlay.hover = overlay.at(x, y);
+    if (overlay.hover?.kind === "item") markRead(here.reel.id);
     if (kind === "down") {
       lastInput = time;
       if (soundOn) sfx.setEnabled(true);
@@ -509,7 +528,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
 
     pctx.imageSmoothingEnabled = false;
     pctx.drawImage(transition ? rollFilm(transition.t / ROLL_TIME, transition.dir) : buffer, 0, 0, picture.width, picture.height);
-    overlay.draw(pctx, here.reel, time);
+    overlay.draw(pctx, here.reel, time, !readReels.has(here.reel.id));
   };
 
   /**
