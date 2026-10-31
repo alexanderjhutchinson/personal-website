@@ -16,8 +16,8 @@ const { open } = Astro.props;
   <p class="loading" aria-live="polite">Threading the film…</p>
 
   <div class="top-bar">
-    <a id="read-program" class="skip" href="/program">Read the program</a>
-    <button id="look-photos" class="skip look" type="button">Look at the photos on the pin board</button>
+    <a id="read-program" class="skip keys-only" href="/program">Read the program</a>
+    <button id="look-photos" class="skip keys-only look" type="button">Look at the photos on the pin board</button>
     <button id="sound-toggle" class="reel-button sound" type="button" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
@@ -125,7 +125,6 @@ const { open } = Astro.props;
     color: var(--ink-dim);
   }
 
-  /* For the keyboard only: hidden until it has focus, so the room keeps its no-markers rule. */
   .look {
     padding: 0;
     border: 0;
@@ -135,7 +134,8 @@ const { open } = Astro.props;
     text-underline-offset: 0.2em;
   }
 
-  .look:not(:focus-visible) {
+  /* For the keyboard and screen readers only: hidden until it has focus, so the room keeps its no-markers rule. */
+  .keys-only:not(:focus-visible) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -143,6 +143,10 @@ const { open } = Astro.props;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
+  }
+
+  .sound {
+    margin-left: auto;
   }
 
   .sound .waves {
