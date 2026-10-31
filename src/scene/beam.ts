@@ -24,6 +24,8 @@ export interface Beam {
   group: THREE.Group;
   /** Beam strength, 0 to 1. Multiplied by the film's own brightness each frame. */
   update(time: number, strength: number, filmBrightness: number): void;
+  /** Keep the dust the same size on screen at whatever resolution the room draws. */
+  setPixelRatio(ratio: number): void;
 }
 
 export function buildBeam(lens: THREE.Vector3, corners: THREE.Vector3[]): Beam {
@@ -180,6 +182,9 @@ export function buildBeam(lens: THREE.Vector3, corners: THREE.Vector3[]): Beam {
       dustMat.uniforms.uStrength.value = s;
       group.visible = s > 0.001;
     },
+    setPixelRatio(ratio) {
+      dustMat.uniforms.uPixelRatio.value = ratio;
+    },
   };
 }
 
@@ -238,6 +243,9 @@ export function buildRoomDust(center: THREE.Vector3, radius: number) {
       mat.uniforms.uTime.value = time;
       mat.uniforms.uStrength.value = strength;
       points.visible = strength > 0.001;
+    },
+    setPixelRatio(ratio: number) {
+      mat.uniforms.uPixelRatio.value = ratio;
     },
   };
 }

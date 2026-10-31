@@ -2,7 +2,6 @@ import gsap from "gsap";
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import type { ReelId } from "../data";
@@ -18,6 +17,7 @@ import type { RegionAction } from "./programPages";
 import { buildProjector, type Projector } from "./projector";
 import { clamp, lerp } from "./random";
 import { buildRoom, type Room } from "./room";
+import { ScenePass } from "./scenePass";
 import { ProjectorSound } from "./sound";
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures";
 
@@ -104,6 +104,18 @@ const REEL_LOOK = { grain: 0.05, flicker: 0.02, weave: 0 };
 /** The lamps while a reel plays: house lights at a low glow, so the room stays visible around the screen. */
 const REEL_LAMP = 0.28;
 
+/**
+ * Frames per second the room is drawn at: smooth while anything moves, half that while it sits
+ * still on the couch or in hand. Screens refresh at 60 to 144 times a second or more, and drawing
+ * every one of them kept the GPU busy the whole time the page was open.
+ */
+const MOVING_RATE = 60;
+const STILL_RATE = 30;
+/** How long after the pointer last moved the room still counts as moving (the parallax eases in). */
+const SETTLE_MS = 1500;
+/** Drawn frames sampled before deciding whether the machine keeps up. */
+const PACE_SAMPLES = 45;
+
 export interface TheaterOptions {
   reducedMotion: boolean;
   /** Return true when the visitor has already seen the full opening. */
@@ -125,6 +137,7 @@ export class Theater {
   private renderer!: THREE.WebGLRenderer;
   private camera!: THREE.PerspectiveCamera;
   private composer!: EffectComposer;
+  private scenePass!: ScenePass;
   private bloom!: UnrealBloomPass;
   private filmPass!: ReturnType<typeof createFilmPass>;
   private room!: Room;
@@ -163,6 +176,15 @@ export class Theater {
   private glint = 0;
   private raf = 0;
   private last = 0;
+  /** When the last frame was drawn, and the display time owed toward the next one. */
+  private drawn = 0;
+  private owed = 0;
+  private lastInput = 0;
+  /** Something covers the whole room, so there's nothing to draw. */
+  private held = false;
+  /** How far drawing has been cut back for a machine that can't keep up (see lowerQuality). */
+  private quality = 0;
+  private pace: number[] = [];
   private time = 0;
   private hover = 0;
   private hovering: HoverTarget = null;
@@ -254,9 +276,11 @@ export class Theater {
     this.ventLight.position.copy(PROJECTOR.position).add(new THREE.Vector3(-0.12, 0.1, 0));
     scene.add(this.ventLight);
 
-    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    // Only the scene pass anti-aliases; the passes after it work on plain buffers.
+    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
     this.composer = new EffectComposer(renderer, target);
-    this.composer.addPass(new RenderPass(scene, this.camera));
+    this.scenePass = new ScenePass(scene, this.camera, 4);
+    this.composer.addPass(this.scenePass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.55, 0.85);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -605,6 +629,7 @@ export class Theater {
   }
 
   private onPointerMove(e: PointerEvent) {
+    this.lastInput = performance.now();
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     if (e.pointerType !== "mouse") return;
@@ -628,6 +653,8 @@ export class Theater {
     const pr = this.renderer.getPixelRatio();
     this.bloom.setSize((w * pr) / 2, (h * pr) / 2);
     this.filmPass.uniforms.uResolution.value.set(w * pr, h * pr);
+    this.beam.setPixelRatio(pr);
+    this.roomDust.setPixelRatio(pr);
     this.camera.aspect = w / h;
     this.applyCamera();
     // Turning a phone between tall and wide while holding the program: keep showing the same part of it.
@@ -643,19 +670,74 @@ export class Theater {
     }
   }
 
+  /** Stop drawing while something covers the whole room, and pick up again once it's gone. */
+  hold(on: boolean) {
+    if (on === this.held) return;
+    this.held = on;
+    if (on) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    } else {
+      this.startLoop();
+    }
+  }
+
+  private get frameRate() {
+    if (this.mode !== "idle" && this.mode !== "program") return MOVING_RATE;
+    const moving = gsap.isTweening(this.state) || performance.now() - this.lastInput < SETTLE_MS;
+    return moving ? MOVING_RATE : STILL_RATE;
+  }
+
   private startLoop() {
-    if (this.raf) return;
-    this.last = performance.now();
+    if (this.raf || this.held) return;
+    this.last = this.drawn = performance.now();
+    this.owed = 0;
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (now - this.last) / 1000);
+      // Draw only as often as the frame rate asks, however fast the screen refreshes.
+      const interval = 1000 / this.frameRate;
+      this.owed = Math.min(this.owed + now - this.last, interval * 1.5);
       this.last = now;
+      if (this.owed < interval - 1) return;
+      this.owed = Math.max(0, this.owed - interval);
+      const gap = now - this.drawn;
+      this.drawn = now;
+      this.watchPace(gap, interval);
+      const dt = Math.min(0.05, gap / 1000);
       this.time += dt;
       this.applyState(dt);
       this.composer.render(dt);
       this.opts.onFrame?.();
     };
     this.raf = requestAnimationFrame(tick);
+  }
+
+  /**
+   * If frames keep coming late, the machine can't keep up: cut back what each frame draws, a step at
+   * a time. Gaps over a quarter second are a tab in the background, not a slow machine.
+   */
+  private watchPace(gap: number, interval: number) {
+    if (this.quality >= 3 || gap > 250) return;
+    this.pace.push(gap / interval);
+    if (this.pace.length < PACE_SAMPLES) return;
+    const late = this.pace.sort((a, b) => a - b)[this.pace.length >> 1];
+    this.pace = [];
+    if (late > 1.4) this.lowerQuality();
+  }
+
+  /** First without anti-aliasing, then at one pixel per screen pixel, then without bloom. */
+  private lowerQuality() {
+    this.quality++;
+    if (this.quality === 1) this.scenePass.samples = 0;
+    if (this.quality === 2) {
+      if (this.renderer.getPixelRatio() > 1) {
+        this.renderer.setPixelRatio(1);
+        this.resize();
+      } else {
+        this.quality++;
+      }
+    }
+    if (this.quality === 3) this.bloom.enabled = false;
   }
 
   /** Where the camera sits on the couch, framed for the current aspect ratio. */
