@@ -10,7 +10,7 @@ import { paintReelStill } from "../lobby/still";
 import { buildBeam, buildRoomDust, type Beam } from "./beam";
 import { COUNT_STEP, Film } from "./film";
 import { createFilmPass } from "./filmPass";
-import { COUCH, IMAGE, PROGRAM, PROJECTOR, SCREEN } from "./layout";
+import { COUCH, IMAGE, PROGRAM, PROJECTOR, REEL_VIEW, SCREEN, reelRect } from "./layout";
 import { palette } from "./palette";
 import { buildProgram, PAPER, type ProgramPaper } from "./program";
 import type { RegionAction } from "./programPages";
@@ -24,11 +24,11 @@ import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures
  * - idle: the room, lamp on, waiting for the projector to be started
  * - program: the program is picked up and held in front of the camera
  * - playing: the start sequence is running
- * - entering: the camera has reached the screen and the page is fading out to the feature
- * - entered: the camera is in the screen; the 3D scene is paused while the feature loads
+ * - entering: the camera has reached the screen and the reel is fading in over it
+ * - reel: a reel is playing on the screen; the room is drawn at film speed around it
  * - ending: the ending sequence is running
  */
-export type Mode = "idle" | "program" | "playing" | "entering" | "entered" | "ending";
+export type Mode = "idle" | "program" | "playing" | "entering" | "reel" | "ending";
 
 export type HoverTarget = "projector" | "program" | null;
 
@@ -96,6 +96,12 @@ const right = new THREE.Vector3();
 
 const IDLE_LOOK = { grain: 0.045, flicker: 0.0, weave: 0.0 };
 const FILM_LOOK = { grain: 0.1, flicker: 0.1, weave: 1.4 };
+/** While a reel plays: no gate weave, so the room's screen stays lined up with the reel drawn over it. */
+const REEL_LOOK = { grain: 0.05, flicker: 0.02, weave: 0 };
+/** Rendering rate for the room while a reel plays over it. */
+const REEL_FPS = 24;
+/** The lamps while a reel plays: house lights at a low glow, so the room stays visible around the screen. */
+const REEL_LAMP = 0.28;
 
 export interface TheaterOptions {
   reducedMotion: boolean;
@@ -385,20 +391,6 @@ export class Theater {
     }
   }
 
-  /** Back to the room with the lights up, from wherever things were (the page came back from the browser's cache). */
-  reset() {
-    this.tl?.kill();
-    this.tl = null;
-    this.paperTl?.kill();
-    this.paperTl = null;
-    this.sound.stopMotor(0.2);
-    Object.assign(this.state, { lamp: 1, running: 0, reels: 0, beam: 0, screen: 0, cam: 0, ...IDLE_LOOK, fade: 0 });
-    Object.assign(this.state, { paper: 0, open: PROGRAM.open, flip: 0, focus: 0 });
-    this.film.set("dark");
-    this.setMode("idle");
-    this.startLoop();
-  }
-
   /**
    * Run the opening: full on a first visit, short after that. After the countdown the
    * screen goes back to bare projector light and the camera moves into it; what's
@@ -440,9 +432,9 @@ export class Theater {
       tl.call(() => this.sound.pop(), [], 0.95 + COUNT_STEP);
       tl.call(() => this.film.set("leader"), [], 0.95 + COUNT_STEP * 3);
       tl.to(s, { cam: 1, duration: 1.25, ease: "power2.inOut" }, 2.95);
-      tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 1.0 }, 3.0);
-      tl.call(() => this.beginCrossfade(), [], 3.8);
-      tl.to({}, { duration: 0.45 }, 3.8);
+      tl.to(s, { ...REEL_LOOK, duration: 1.0 }, 3.0);
+      tl.call(() => this.beginCrossfade(), [], 4.2);
+      tl.to({}, { duration: 0.45 }, 4.2);
     } else {
       tl.call(() => this.sound.startMotor(0.5), [], 0);
       tl.to(s, { lamp: 0.035, duration: 0.4, ease: "power2.inOut" }, 0);
@@ -452,18 +444,24 @@ export class Theater {
       tl.to(s, { beam: 1, screen: 1, duration: 0.2 }, 0.15);
       tl.to(s, { ...FILM_LOOK, duration: 0.3 }, 0.15);
       tl.to(s, { cam: 1, duration: 1.05, ease: "power2.inOut" }, 0.55);
-      tl.to(s, { grain: 0.06, flicker: 0.04, weave: 0.6, duration: 0.8 }, 0.6);
-      tl.call(() => this.beginCrossfade(), [], 1.35);
-      tl.to({}, { duration: 0.45 }, 1.35);
+      tl.to(s, { ...REEL_LOOK, duration: 0.8 }, 0.6);
+      tl.call(() => this.beginCrossfade(), [], 1.6);
+      tl.to({}, { duration: 0.45 }, 1.6);
     }
   }
 
-  /** The page opened straight on the resume: treat the film as already running so the ending can play. */
-  assumeEntered() {
+  /** The page opened on a reel: the film is already running and the camera is at the screen. */
+  enterReel(reel: ReelId) {
     if (this.mode !== "idle") return;
-    this.mode = "entered";
-    Object.assign(this.state, { cam: 1, lamp: 0.035, beam: 1, screen: 1, running: 1, reels: 1, fade: 0 });
-    this.stopLoop();
+    Object.assign(this.state, { cam: 1, lamp: REEL_LAMP, beam: 1, screen: 1, running: 1, reels: 1, ...REEL_LOOK });
+    this.showReel(reel);
+    this.setMode("reel");
+  }
+
+  /** Put a still of this reel on the screen, under the live reel, so the light it throws on the room is right. */
+  showReel(reel: ReelId) {
+    this.film.show(paintReelStill(reel));
+    this.film.set("reel");
   }
 
   /** Cut the opening short. */
@@ -472,26 +470,28 @@ export class Theater {
     this.tl?.kill();
     this.tl = null;
     this.film.set("leader");
-    gsap.to(this.state, { beam: 1, screen: 1, lamp: 0.035, running: 1, duration: 0.2 });
-    this.beginCrossfade();
-    window.setTimeout(() => this.finishEnter(), 450);
+    gsap.to(this.state, { beam: 1, screen: 1, lamp: 0.035, running: 1, cam: 1, ...REEL_LOOK, duration: 0.3 });
+    window.setTimeout(() => this.beginCrossfade(), 300);
+    window.setTimeout(() => this.finishEnter(), 750);
   }
 
-  /** Straight to the resume without the camera move (reduced motion, or "skip to the resume"). */
+  /** Straight to the reel without the camera move (reduced motion). */
   enterQuick() {
-    if (this.mode === "entered" || this.mode === "entering") return;
+    if (this.mode === "reel" || this.mode === "entering") return;
     this.tl?.kill();
     this.tl = null;
+    Object.assign(this.state, { cam: 1, lamp: REEL_LAMP, beam: 1, screen: 1, running: 1, reels: 1, ...REEL_LOOK });
+    this.film.set("leader");
     this.beginCrossfade();
     window.setTimeout(() => this.finishEnter(), 450);
   }
 
   /** Run the ending: the screen shows the reel that was playing, the film runs out, the camera pulls back, the lights come up. */
-  end(reel: ReelId = "about") {
-    if (this.mode !== "entered") return;
+  end(reel: ReelId) {
+    if (this.mode !== "reel") return;
     const s = this.state;
     this.tl?.kill();
-    Object.assign(s, { cam: 1, lamp: 0.035, beam: 1, screen: 1, running: 1, reels: 1, ...FILM_LOOK, fade: 0 });
+    Object.assign(s, { cam: 1, beam: 1, screen: 1, running: 1, reels: 1, ...FILM_LOOK, fade: 0 });
     this.film.show(paintReelStill(reel));
     this.film.set("reel");
     this.setMode("ending");
@@ -525,20 +525,13 @@ export class Theater {
   }
 
   private finishEnter() {
-    if (this.mode === "entered") return;
+    if (this.mode === "reel") return;
     this.tl = null;
     this.sound.stopMotor(0.9);
-    this.setMode("entered");
-    this.stopLoop();
-    // Reset to the room so the scene is ready if the visitor comes back.
-    Object.assign(this.state, {
-      lamp: 0.035,
-      running: 1,
-      reels: 1,
-      beam: 1,
-      screen: 1,
-      cam: 1,
-    });
+    Object.assign(this.state, { running: 1, reels: 1, beam: 1, screen: 1, cam: 1, ...REEL_LOOK });
+    // House lights come up a little once the reel is on.
+    gsap.to(this.state, { lamp: REEL_LAMP, duration: this.quick(1.2), ease: "power1.inOut" });
+    this.setMode("reel");
   }
 
   private setMode(mode: Mode) {
@@ -579,7 +572,6 @@ export class Theater {
     this.filmPass.uniforms.uResolution.value.set(w * pr, h * pr);
     this.camera.aspect = w / h;
     this.applyCamera();
-    if (this.mode === "entered") this.composer.render();
     // Turning a phone between tall and wide while holding the program: keep showing the same part of it.
     const views = this.views;
     if (views !== before && this.mode === "program") {
@@ -598,6 +590,8 @@ export class Theater {
     this.last = performance.now();
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick);
+      // While a reel plays over it, the room only needs film speed.
+      if (this.mode === "reel" && now - this.last < 1000 / REEL_FPS) return;
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.time += dt;
@@ -606,11 +600,6 @@ export class Theater {
       this.opts.onFrame?.();
     };
     this.raf = requestAnimationFrame(tick);
-  }
-
-  private stopLoop() {
-    cancelAnimationFrame(this.raf);
-    this.raf = 0;
   }
 
   /** Where the camera sits on the couch, framed for the current aspect ratio. */
@@ -627,22 +616,22 @@ export class Theater {
     return { eye, look, fov: vfov };
   }
 
-  /** Where the camera ends up: close enough that the picture fills the view (or fits it, on portrait screens). */
-  private screenPose(aspect: number) {
-    const fov = 38;
-    const tan = Math.tan(THREE.MathUtils.degToRad(fov / 2));
-    const byHeight = IMAGE.height / (2 * tan);
-    const byWidth = IMAGE.width / (2 * tan * aspect);
-    const d = aspect >= 1 ? Math.min(byHeight, byWidth) * 0.97 : Math.max(byHeight, byWidth) * 1.06;
+  /**
+   * Where the camera ends up while a reel plays: square on to the screen, with the picture filling
+   * the part of the view reelRect() gives, so the reel drawn over it lines up exactly.
+   */
+  private reelPose(aspect: number) {
+    const rect = reelRect(aspect, 1);
+    const fov = THREE.MathUtils.radToDeg(2 * Math.atan(IMAGE.height / rect.h / (2 * REEL_VIEW.distance)));
     const look = SCREEN.center.clone();
-    const eye = look.clone().add(new THREE.Vector3(0, 0, d));
+    const eye = look.clone().add(new THREE.Vector3(0, 0, REEL_VIEW.distance));
     return { eye, look, fov };
   }
 
   private applyCamera() {
     const aspect = this.size.w / this.size.h;
     const a = this.couchPose(aspect);
-    const b = this.screenPose(aspect);
+    const b = this.reelPose(aspect);
     const c = this.state.cam;
     const eye = a.eye.clone().lerp(b.eye, c);
     const look = a.look.clone().lerp(b.look, c);

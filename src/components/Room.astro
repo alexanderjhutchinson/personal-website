@@ -1,0 +1,28 @@
+---
+import type { ReelId } from "../data";
+import ProgramView from "./ProgramView.astro";
+import Reel from "./Reel.astro";
+import Stage from "./Stage.astro";
+
+// The whole site is one room: the 3D living room, the program on its coffee
+// table, and the reels playing on its screen. Every page is this room, opened
+// in a different state.
+
+interface Props {
+  /** Open with the program already picked up. */
+  open?: "program";
+  /** Open with this reel playing on the screen. */
+  reel?: ReelId;
+}
+
+const { open, reel } = Astro.props;
+---
+
+<Stage open={open} />
+<Reel reel={reel} />
+{!reel && <ProgramView />}
+
+<script>
+  import { boot } from "../scene/boot";
+  boot();
+</script>

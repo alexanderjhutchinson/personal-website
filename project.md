@@ -6,7 +6,8 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 
 - **Phase 1 (the living room) is built** and merged into `main` (#1).
 - **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. Merged into `main` (#2).
-- **The room, the program and the feature are tied together** on branch `program-paper` (see "The program" below): the resume is a folded program on the coffee table, and the opening runs straight into Reel 1.
+- **The room, the program and the feature are tied together** (merged in #3): the resume is a folded program on the coffee table, and the opening runs straight into Reel 1.
+- **One room** on branch `one-room` (see "One room" below): the reels play on the room's screen instead of on pages of their own.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Nothing is deployed yet.**
 - **Next:** see "Phase 2: next up".
@@ -127,7 +128,7 @@ The screen picks up the reel that was playing, then the film runs out: flickerin
 
 The site had three parts that didn't feel like one thing: the room, the resume, and the reels. The fix: the resume is a printed program sitting in the room, and the room's film is the feature.
 
-### Status: built (branch `program-paper`)
+### Status: built (merged in #3)
 
 - **A folded program stands on the coffee table,** half open like a greeting card, between the film cans and the projector. Same design as before (cream paper, title-card type, diamond ornaments), painted in code.
 - **A game-style prompt points at it:** "[E] Pick up the program" (or "Tap to pick up the program") just above it, and the paper shimmers, until it's been picked up once. After that the prompt shows on hover only.
@@ -146,6 +147,32 @@ The site had three parts that didn't feel like one thing: the room, the resume, 
 Checked in the browser at 16:9, square and phone sizes: the prompt, pick up, all three views, putting it down, picking Reel 2 from the cover (the film plays and lands on `/experience`), the program on a reel page, "End the film", the browser back button from a reel, `/program`, and the page without WebGL (simulated). Not tested: Safari and Firefox, real phones, and the page with WebGL actually missing.
 
 ---
+
+## One room: the reels on the room's screen
+
+The critique after #3: the landing page and the feature still didn't feel like one thing. The room was a realistic 3D living room; the reels were a pixel game on a dark page of their own, with purple game menus. You left the room to see the feature.
+
+### Status: built (branch `one-room`)
+
+- **The site never leaves the room.** The reels play on the pull-down screen. After the opening the camera stops square-on to the screen with the picture filling about three quarters of the view, so the screen's black border, the paneling, the plant and the radio stay around it. The lamps come back up to a low glow once the reel is on, like house lights at half.
+- **The game is laid exactly over the screen's picture.** The page works out where the picture sits from the window size alone (`src/scene/screen.ts`), so a reel can be placed before three.js has loaded. While a reel plays, the room is drawn at 24 frames a second with no gate weave, so the screen stays lined up with the reel.
+- **One page.** `/`, `/program` and each reel's address are the same page in different states. Going into the film adds the reel's address to the history; the × and the back button play the ending (the reel gives way to the same picture on the room's screen, the film runs out, the camera pulls back) with no page load.
+- **A reel's address** opens with that reel already on the screen and the room fading in around it.
+- **One visual language.** Pixel art stays inside the film (the scenes and the in-game hotbar, whose slots are now warm brown). Everything around it uses the room's look:
+  - the item panel: a dark card with the room's double rule, a Fraunces heading, body type, and mono details
+  - the door and sound buttons and the ×: the room's amber and cream mono buttons
+  - each reel's title: a silent-film title card (mono "REEL 2" in amber over the name in Fraunces)
+  - item cards: printed on the program's cream paper, with its double rule
+  - item name colors warmed to the room's palette: burnt orange for school, amber for work, avocado for projects
+- Sound is shared: the reel's speaker button and the room's sound button are the same setting.
+- Without WebGL, `/` and `/program` show the program on its own and a reel's address shows the reel on its own, as before.
+
+Checked in Chromium at 16:9 and phone sizes: from the couch into Reel 1, a reel's address directly, doors between reels on the screen, the item card, the ×, back and forward between the room and a reel, and `/program` into Reel 2 from the cover. The page's script is 21 KB gzipped; the room (three.js) still loads after it. Not tested: Safari, Firefox, real phones, and a browser without WebGL.
+
+Not done yet:
+
+- A pass on the pixel palette toward the room's 70s colors (mustard, burnt orange, avocado, teak).
+- The reel's light on the room is a still of the reel's first frame, not the live picture.
 
 ## Phase 2: the world and how info is communicated
 
@@ -180,7 +207,7 @@ Moving between reels:
 - Each scene has a doorway at the edge with a signpost. Walking out of it changes the reel.
 - Door buttons at the bottom corners ("Reel 2 · Experience →") run the character to that door. A second press cuts right away, and the film cuts anyway if the character is blocked or takes over 2.4 seconds.
 - The cut is a frame roll: the old frame slides off, the black frame line passes, the new frame settles, with a ratchet of clicks if sound is on. The reel name then shows like an intertitle, and the character walks in through the opposite door.
-- Each reel has its own address, and the browser back and forward buttons move between reels. `/lobby` redirects to `/about`.
+- Each reel has its own address, and the browser back and forward buttons move between reels. `/lobby` redirects to `/about`. (Since "One room", the addresses open the room with that reel on its screen.)
 - Each reel keeps its world for the visit, so mined blocks stay mined. The hotbar carries over.
 - Reduced motion: no roll and no walk, just the cut.
 
@@ -189,7 +216,7 @@ Content:
 - One file per job (`src/data/jobs/`) and per project (`src/data/projects/`). Profile, education and skills are in `src/data/profile.ts`. The reels and the program both read from these.
 - Each reel has a panel of its items. It sits over the frame's top right on wide screens and under the frame on narrow ones. Names use the pixel font, and details use the mono font, because the pixel font's digits are hard to read small.
 - Clicking an item opens its card (Escape, the Close button, or a click outside closes it). The card's address is shareable, like `/projects#speakeasy`.
-- Name colors follow the type (the leaning from "Still open"): blue for school, gold for work, green for projects.
+- Name colors follow the type (the leaning from "Still open"): burnt orange for school, amber for work, avocado for projects (warmed from blue, gold and green in "One room").
 - Each item has its own pixel icon (turbine, briefcase, leaf, server, speech bubble, gamepad, diploma, toolbox, envelope).
 - The reels keep the screen clean: no key guide, no program link, and no tuning button. Visitors work out the controls themselves. Sound is a speaker button in the frame's bottom-left corner, beside the left door.
 

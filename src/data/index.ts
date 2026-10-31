@@ -57,10 +57,10 @@ export const REELS: readonly Reel[] = [
 
 /** What an item's name color means. */
 export const ITEM_TYPES = {
-  school: { label: "School", color: "#8fbfff" },
-  work: { label: "Work", color: "#f2c14e" },
-  project: { label: "Project", color: "#8fe07a" },
-  info: { label: "Info", color: "#f4eedf" },
+  school: { label: "School", color: "#e58a5c" },
+  work: { label: "Work", color: "#e0a33a" },
+  project: { label: "Project", color: "#b7c46c" },
+  info: { label: "Info", color: "#ece1c9" },
 } as const;
 export type ItemType = keyof typeof ITEM_TYPES;
 

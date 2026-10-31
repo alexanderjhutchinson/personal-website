@@ -206,7 +206,7 @@ export function mountContent() {
     if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);
   });
 
-  const reel = document.getElementById("stage")?.dataset.reel;
+  const reel = document.getElementById("reel-stage")?.dataset.reel;
   const linked = `${reel}/${decodeURIComponent(location.hash.slice(1))}`;
   if (location.hash && [...cards].some((card) => card.dataset.card === linked)) open(linked);
 }

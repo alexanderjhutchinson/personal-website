@@ -12,7 +12,7 @@ import { SCENES, type ReelScene } from "./scenes";
 import { Sfx } from "./sfx";
 import { Tile, TILES } from "./tiles";
 import { World } from "./world";
-import { REELS, type Reel } from "../data";
+import { REELS, type Reel, type ReelId } from "../data";
 import { person } from "../data/profile";
 
 const STEP = 1 / 120;
@@ -48,7 +48,34 @@ function rectsOverlap(a: { x: number; y: number; w: number; h: number }, b: { x:
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-export function startLobby() {
+/** A part of the window, in CSS pixels. */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** What the living room controls about the reels. */
+export interface Lobby {
+  /** The reel that's loaded. */
+  readonly reel: ReelId;
+  /** Jump straight to a reel, with no roll, the character at its start. */
+  open(reel: ReelId): void;
+  /** Run the game and take the keyboard and pointer, or pause it. */
+  setActive(on: boolean): void;
+  /** Fit the reel into this part of the window (the room's screen), or into the whole window when null. */
+  place(rect: Rect | null): void;
+  /** Sound turned on or off elsewhere (the room's sound button). */
+  setSound(on: boolean): void;
+}
+
+export interface LobbyOptions {
+  /** Called when the reel's own sound button is pressed. */
+  onSound?: (on: boolean) => void;
+}
+
+export function startLobby(opts: LobbyOptions = {}): Lobby | null {
   const canvas = document.getElementById("lobby-canvas") as HTMLCanvasElement | null;
   const frame = document.getElementById("frame");
   const hotbar = document.getElementById("hotbar");
@@ -56,13 +83,13 @@ export function startLobby() {
   const label = document.getElementById("item-label");
   const tuningPanel = document.getElementById("tuning");
   const soundButton = document.getElementById("lobby-sound");
-  const stage = document.getElementById("stage");
+  const stage = document.getElementById("reel-stage");
   const prevButton = document.getElementById("door-prev");
   const nextButton = document.getElementById("door-next");
   const titleCard = document.getElementById("reel-title");
-  if (!canvas || !frame || !stage || !hotbar || !tooltip || !label || !tuningPanel) return;
+  if (!canvas || !frame || !stage || !hotbar || !tooltip || !label || !tuningPanel) return null;
   const screen = canvas.getContext("2d");
-  if (!screen) return;
+  if (!screen) return null;
 
   const tuning = loadTuning();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -141,7 +168,11 @@ export function startLobby() {
     }
     sfx.setEnabled(soundOn);
     renderSound();
+    opts.onSound?.(soundOn);
   });
+
+  // The room shares the screen: the game only runs, and only takes keys and the pointer, while a reel is up.
+  let active = false;
 
   // Input.
   const keys = new Set<string>();
@@ -151,8 +182,8 @@ export function startLobby() {
   const GAME_KEYS = new Set(["KeyA", "KeyD", "KeyW", "KeyS", "Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 
   window.addEventListener("keydown", (e) => {
-    // Item cards and the program are dialogs; the game ignores keys while one is open.
-    if (e.target instanceof HTMLInputElement || document.querySelector("dialog[open]")) return;
+    // Item cards are dialogs; the game ignores keys while one is open.
+    if (!active || e.target instanceof HTMLInputElement || document.querySelector("dialog[open]")) return;
     // Space and Enter press a button that has keyboard focus instead of jumping.
     const focused = e.target instanceof HTMLElement && e.target.matches("button:focus-visible, a:focus-visible");
     if (focused && (e.code === "Space" || e.code === "Enter")) return;
@@ -208,6 +239,7 @@ export function startLobby() {
   canvas.addEventListener(
     "wheel",
     (e) => {
+      if (!active) return;
       e.preventDefault();
       inv.select(inv.selected + Math.sign(e.deltaY));
     },
@@ -312,9 +344,7 @@ export function startLobby() {
 
   const renderReel = () => {
     const { reel } = here;
-    document.title = `${reel.title} · ${person.name}`;
-    // The × ends the film on whichever reel is playing.
-    document.getElementById("end-film")?.setAttribute("href", `/?end=${reel.id}`);
+    if (active) document.title = `${reel.title} · ${person.name}`;
     canvas.setAttribute("aria-label", `Reel ${reel.number}, ${reel.title}. ${scene.alt}`);
     for (const panel of panels) panel.hidden = panel.dataset.reelPanel !== reel.id;
     for (const [button, target] of [
@@ -393,9 +423,10 @@ export function startLobby() {
   prevButton?.addEventListener("click", () => leave(-1));
   nextButton?.addEventListener("click", () => leave(1));
 
+  // Back and forward between reels. Leaving the reels for the room is the room's to handle.
   window.addEventListener("popstate", () => {
     const reel = reelAt(location.pathname);
-    if (!reel || reel.id === here.reel.id) return;
+    if (!active || !reel || reel.id === here.reel.id) return;
     auto = null;
     go(reel, REELS.indexOf(reel) > REELS.indexOf(here.reel) ? 1 : -1, false);
   });
@@ -514,13 +545,18 @@ export function startLobby() {
     return rollFrame;
   };
 
-  // Scale the frame to fit, using whole-pixel multiples when there's room.
+  // Size the frame. On the room's screen it fills the picture's width, centered top to bottom like a
+  // film letterboxed in the gate. On its own it fits the window, in whole-pixel multiples when there's room.
+  let rect: Rect | null = null;
   const resize = () => {
-    const availW = document.documentElement.clientWidth - 32;
-    const availH = window.innerHeight - 100;
-    let s = Math.min(availW / WIDTH, availH / HEIGHT);
-    if (s >= 2) s = Math.floor(s);
-    s = Math.max(s, 0.5);
+    let s: number;
+    if (rect) {
+      s = rect.w / WIDTH;
+    } else {
+      s = Math.min((document.documentElement.clientWidth - 32) / WIDTH, (window.innerHeight - 100) / HEIGHT);
+      if (s >= 2) s = Math.floor(s);
+      s = Math.max(s, 0.5);
+    }
     const cssW = Math.round(WIDTH * s);
     const cssH = Math.round(HEIGHT * s);
     const dpr = window.devicePixelRatio || 1;
@@ -530,11 +566,12 @@ export function startLobby() {
     canvas.height = Math.round(cssH * dpr);
     stage.style.setProperty("--px", `${s}px`);
     stage.style.width = `${cssW}px`;
+    stage.style.left = rect ? `${Math.round(rect.x)}px` : "";
+    stage.style.top = rect ? `${Math.round(rect.y + (rect.h - cssH) / 2)}px` : "";
   };
   resize();
   window.addEventListener("resize", resize);
   renderReel();
-  showTitle();
 
   if (import.meta.env.DEV) {
     // Handle for poking at the lobby from the browser console while developing.
@@ -569,7 +606,8 @@ export function startLobby() {
     };
   }
 
-  let last = performance.now();
+  let raf = 0;
+  let last = 0;
   let acc = 0;
   const loop = (now: number) => {
     acc += Math.min(0.1, (now - last) / 1000);
@@ -579,7 +617,51 @@ export function startLobby() {
       acc -= STEP;
     }
     render();
-    requestAnimationFrame(loop);
+    raf = requestAnimationFrame(loop);
   };
-  requestAnimationFrame(loop);
+
+  return {
+    get reel() {
+      return here.reel.id;
+    },
+    open(id) {
+      const reel = REELS.find((r) => r.id === id);
+      if (!reel) return;
+      here = stateFor(reel);
+      ({ world, dummy, scene } = here);
+      player = new Player(scene.spawn.x, scene.spawn.y);
+      auto = null;
+      transition = null;
+      drops = [];
+      particles = [];
+      floaters = [];
+      shake = 0;
+      lastInput = time;
+      renderReel();
+      render();
+    },
+    setActive(on) {
+      if (on === active) return;
+      active = on;
+      if (on) {
+        renderReel();
+        showTitle();
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+      } else {
+        cancelAnimationFrame(raf);
+        keys.clear();
+        mouse.down = false;
+      }
+    },
+    place(next) {
+      rect = next;
+      resize();
+    },
+    setSound(on) {
+      soundOn = on;
+      sfx.setEnabled(on);
+      renderSound();
+    },
+  };
 }

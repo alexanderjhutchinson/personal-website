@@ -1,10 +1,14 @@
 import { REELS, type Reel } from "../data";
+import { person } from "../data/profile";
+import { startLobby } from "../lobby/game";
+import { reelRect } from "./screen";
 import type { RegionAction } from "./programPages";
 import type { Mode, Theater } from "./theater";
 
 // Connects the 3D room to the page: buttons, keyboard, sound preference,
-// first-visit tracking, the program (picked up and turned), and the hand-off
-// from the opening to the feature's first reel.
+// first-visit tracking, the program (picked up and turned), and the reels,
+// which play on the room's screen. The whole site is this one page; each
+// address opens it in a different state.
 
 const SEEN_KEY = "movie-night:seen-intro";
 const SOUND_KEY = "movie-night:sound";
@@ -26,17 +30,19 @@ function write(key: string, value: string) {
   }
 }
 
-/** "flat" is the page without the 3D room: the program on its own. */
-type PageMode = "room" | "program" | "playing" | "entering" | "ending" | "flat";
+/** "flat" is the page without the 3D room: the program on its own, or a reel on its own. */
+type PageMode = "room" | "program" | "playing" | "entering" | "reel" | "ending" | "flat";
 
 const pageMode: Record<Mode, PageMode> = {
   idle: "room",
   program: "program",
   playing: "playing",
   entering: "entering",
-  entered: "entering",
+  reel: "reel",
   ending: "ending",
 };
+
+const reelAt = (path: string) => REELS.find((r) => r.path === path.replace(/\/+$/, ""));
 
 export function boot() {
   const root = document.documentElement;
@@ -45,6 +51,7 @@ export function boot() {
   const canvas = $<HTMLCanvasElement>("scene");
   const soundButton = $<HTMLButtonElement>("sound-toggle");
   const readLink = $<HTMLAnchorElement>("read-program");
+  const endButton = $<HTMLAnchorElement>("end-film");
   const pickup = $("pickup");
   const viewName = document.querySelector("[data-view-name]");
   const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
@@ -52,22 +59,58 @@ export function boot() {
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const openProgram = stage.dataset.open === "program";
-  // A reel's × links here with ?end=<reel>: the room opens inside the screen on that reel and plays the ending.
-  const endParam = new URLSearchParams(location.search).get("end");
-  const endingOn = endParam === null ? null : (REELS.find((r) => r.id === endParam) ?? REELS[0]);
+  /** The page opened on a reel's address. */
+  const openedOn = reelAt(location.pathname);
   const setPageMode = (mode: PageMode) => {
     root.dataset.mode = mode;
   };
 
   let theater: Theater | null = null;
   let loading: Promise<Theater | null> | null = null;
-  /** The reel the film opens on. */
+  /** The reel the film opens on, and whether going in adds it to the browser history. */
   let feature: Reel = REELS[0];
+  let pushFeature = true;
+
+  // Sound preference, shared by the room and the reels.
+  let soundOn = read(SOUND_KEY) === "on";
+  const renderSound = () => {
+    if (!soundButton) return;
+    soundButton.setAttribute("aria-pressed", String(soundOn));
+    const label = soundButton.querySelector("[data-label]");
+    if (label) label.textContent = soundOn ? "Sound on" : "Sound off";
+  };
+  const setSound = (on: boolean) => {
+    soundOn = on;
+    write(SOUND_KEY, on ? "on" : "off");
+    renderSound();
+    theater?.sound.setEnabled(on);
+  };
+  renderSound();
+
+  // The reels: the game, laid exactly over the picture on the room's screen.
+  const lobby = startLobby({ onSound: setSound });
+  const placeReel = () => {
+    if (!lobby) return;
+    if (root.dataset.mode === "flat") {
+      lobby.place(null);
+      return;
+    }
+    const view = canvas.getBoundingClientRect();
+    const rect = reelRect(view.width, view.height);
+    lobby.place({ x: view.left + rect.x, y: view.top + rect.y, w: rect.w, h: rect.h });
+  };
+  window.addEventListener("resize", placeReel);
+
+  soundButton?.addEventListener("click", () => {
+    setSound(!soundOn);
+    lobby?.setSound(soundOn);
+  });
 
   const fallBack = (err: unknown) => {
-    console.warn("The 3D room couldn't start, showing the program instead.", err);
+    console.warn("The 3D room couldn't start, showing the page without it.", err);
     setPageMode("flat");
     root.dataset.scene = "unavailable";
+    placeReel();
   };
 
   const load = () => {
@@ -91,16 +134,10 @@ export function boot() {
         t.sound.setEnabled(soundOn);
         theater = t;
         delete root.dataset.loading;
-        if (endingOn) {
-          history.replaceState(null, "", "/");
-          t.assumeEntered();
-          t.end(endingOn.id);
-        } else if (openProgram) {
-          pickUp();
-        } else {
-          // Give the room a moment to fade in before pointing at the program.
-          window.setTimeout(updatePrompt, reducedMotion ? 0 : 1200);
-        }
+        if (openedOn) t.enterReel(openedOn.id);
+        else if (openProgram) pickUp();
+        // Give the room a moment to fade in before pointing at the program.
+        else window.setTimeout(updatePrompt, reducedMotion ? 0 : 1200);
         return t;
       })
       .catch((err) => {
@@ -115,28 +152,16 @@ export function boot() {
     // The address follows the program, so a reload or a shared link opens it again.
     if (mode === "program" && location.pathname !== "/program") history.replaceState(null, "", "/program");
     if (mode === "idle" && location.pathname === "/program") history.replaceState(null, "", "/");
-    if (mode === "entered") {
+    if (mode === "entering") {
+      // The camera has reached the screen: the reel fades in over it.
       write(SEEN_KEY, "1");
-      location.assign(feature.path);
+      if (pushFeature && location.pathname !== feature.path) history.pushState(null, "", feature.path);
+      placeReel();
+      lobby?.setActive(true);
     }
+    if (mode === "reel" && lobby) theater?.showReel(lobby.reel);
     updatePrompt();
   };
-
-  // Sound preference.
-  let soundOn = read(SOUND_KEY) === "on";
-  const renderSound = () => {
-    if (!soundButton) return;
-    soundButton.setAttribute("aria-pressed", String(soundOn));
-    const label = soundButton.querySelector("[data-label]");
-    if (label) label.textContent = soundOn ? "Sound on" : "Sound off";
-  };
-  renderSound();
-  soundButton?.addEventListener("click", () => {
-    soundOn = !soundOn;
-    write(SOUND_KEY, soundOn ? "on" : "off");
-    renderSound();
-    theater?.sound.setEnabled(soundOn);
-  });
 
   // The program.
   const pickUp = () => {
@@ -148,14 +173,25 @@ export function boot() {
   const putDown = () => void theater?.putDown();
 
   /** Start the film; it opens on this reel. */
-  const startFeature = async (reel: Reel) => {
+  const startFeature = async (reel: Reel, push = true) => {
     feature = reel;
-    if (!theater) {
+    pushFeature = push;
+    if (!theater || !lobby) {
       location.assign(reel.path);
       return;
     }
     await theater.putDown();
+    lobby.open(reel.id);
     theater.start();
+  };
+
+  /** End the film: the reel gives way to the same picture on the room's screen, and the camera pulls back. */
+  const endFeature = (push = true) => {
+    if (!theater || theater.mode !== "reel" || !lobby) return;
+    lobby.setActive(false);
+    if (push) history.pushState(null, "", "/");
+    document.title = person.name;
+    theater.end(lobby.reel);
   };
 
   const follow = (action: RegionAction) => {
@@ -213,10 +249,16 @@ export function boot() {
     pickUp();
   });
 
+  endButton?.addEventListener("click", (e) => {
+    if (!theater) return;
+    e.preventDefault();
+    endFeature();
+  });
+
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
 
-  // Keyboard.
+  // Keyboard. While a reel plays, the keys are the game's.
   document.addEventListener("keydown", (e) => {
     if (!theater || e.metaKey || e.ctrlKey || e.altKey) return;
     const onControl = e.target instanceof Element && !!e.target.closest("button, a, input, textarea, select");
@@ -245,10 +287,21 @@ export function boot() {
     }
   });
 
-  // Coming back with the browser's back button can restore this page mid-hand-off: bring the lights back up.
-  window.addEventListener("pageshow", (e) => {
-    if (e.persisted && theater && (theater.mode === "entering" || theater.mode === "entered")) theater.reset();
+  // Back and forward between the room and the reels (the game handles reel to reel).
+  window.addEventListener("popstate", () => {
+    if (!theater) return;
+    const reel = reelAt(location.pathname);
+    if (reel && (theater.mode === "idle" || theater.mode === "program")) void startFeature(reel, false);
+    else if (!reel && theater.mode === "reel") endFeature(false);
   });
 
-  if (root.dataset.mode === "room") void load();
+  // Opened on a reel: it's up straight away, on the screen, and the room fades in around it.
+  if (openedOn && lobby) {
+    lobby.open(openedOn.id);
+    if (root.dataset.mode === "room") setPageMode("reel");
+    placeReel();
+    lobby.setActive(true);
+  }
+
+  if (root.dataset.mode !== "flat") void load();
 }
