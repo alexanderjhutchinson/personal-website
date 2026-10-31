@@ -87,8 +87,8 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
 
   const tuning = loadTuning();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  // Each reel's item panel points itself out until one of its items has been looked at (hovered or
-  // opened), like the program on the table. Remembered across visits.
+  // Each reel's item panel points itself out until one of its items has been opened, like the program
+  // on the table. Passing the pointer over it doesn't count. Remembered across visits.
   const READ_KEY = "movie-night:read-reels";
   const readReels = new Set<string>();
   try {
@@ -240,7 +240,6 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     mouse.y = y;
     mouse.inside = true;
     overlay.hover = overlay.at(x, y);
-    if (overlay.hover?.kind === "item") markRead(here.reel.id);
     if (kind === "down") {
       lastInput = time;
       if (soundOn) sfx.setEnabled(true);

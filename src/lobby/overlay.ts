@@ -109,7 +109,7 @@ export class Overlay {
 
   /**
    * Draw onto a picture SCALE times the game's size. `fresh` means none of this reel's items have been
-   * looked at yet: the panel then pulses and points itself out, like the program on the table.
+   * opened yet: the panel then pulses and points itself out, like the program on the table.
    */
   draw(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean) {
     ctx.save();
@@ -214,10 +214,10 @@ export class Overlay {
     this.panel = { x: PANEL_X, y: top, w: PANEL_W, h: height };
 
     // For a few seconds after a reel starts the panel glows amber; until one of its items has been
-    // looked at, it keeps pulsing.
+    // opened, it keeps pulsing.
     const since = this.title?.reel.id === reel.id ? now - this.title.start : Infinity;
     const start = since < GLOW_TIME ? (1 - since / GLOW_TIME) * (0.6 + 0.4 * Math.sin(since * 7)) : 0;
-    const glow = Math.max(start, fresh ? 0.35 + 0.3 * Math.sin(now * 3) : 0);
+    const glow = Math.max(start, fresh ? 0.55 + 0.25 * Math.sin(now * 3) : 0);
     ctx.shadowColor = `rgba(224, 163, 58, ${0.7 * glow})`;
     ctx.shadowBlur = 10 * SCALE * glow;
     ctx.fillStyle = PANEL_BG;
