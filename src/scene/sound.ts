@@ -1,7 +1,11 @@
+import { Radio } from "./radio";
+
 /**
  * Projector sounds synthesized with the Web Audio API: the switch, the motor
  * spinning up, the film clattering through the gate, the countdown's 2-pop,
- * and the tail of the film flapping on the reel. No audio files.
+ * and the tail of the film flapping on the reel. Also the paper, the lamp
+ * switches and the radio's knob. No audio files, except the radio's record
+ * (radio.ts).
  */
 export class ProjectorSound {
   enabled = false;
@@ -14,6 +18,9 @@ export class ProjectorSound {
   private timer = 0;
   private nextClick = 0;
   private rate = { from: 0, to: 0, start: 0, duration: 0, loud: 1 };
+  private radio: Radio | null = null;
+  private radioOn = false;
+  private radioDucked = false;
 
   /** Turn sound on or off. Call from a click or key press so the browser lets audio start. */
   setEnabled(on: boolean) {
@@ -21,6 +28,30 @@ export class ProjectorSound {
     if (on) this.ensure();
     if (this.ctx && this.master) {
       this.master.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.05);
+    }
+    this.tuneRadio();
+  }
+
+  /** Switch the radio on or off. It only plays while sound is on. */
+  setRadio(on: boolean) {
+    this.radioOn = on;
+    this.tuneRadio();
+  }
+
+  /** Turn the radio down while the film runs. */
+  duckRadio(down: boolean) {
+    this.radioDucked = down;
+    this.radio?.duck(down);
+  }
+
+  private tuneRadio() {
+    const ctx = this.radioOn ? this.ensure() : null;
+    if (ctx && this.master && this.noise) {
+      this.radio ??= new Radio(ctx, this.master, this.noise);
+      this.radio.duck(this.radioDucked);
+      this.radio.switchOn();
+    } else {
+      this.radio?.switchOff();
     }
   }
 
@@ -98,6 +129,15 @@ export class ProjectorSound {
     const t = ctx.currentTime;
     this.tick(t, 0.5, 2800);
     this.tick(t + 0.035, 0.22, 4200);
+  }
+
+  /** The radio's knob: a dull, chunky click. */
+  knob() {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.tick(t, 0.7, 900);
+    this.tick(t + 0.018, 0.25, 2400);
   }
 
   /** Motor and clatter speed up to running speed over `seconds`. */

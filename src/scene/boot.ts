@@ -83,6 +83,8 @@ export function boot() {
     write(SOUND_KEY, on ? "on" : "off");
     renderSound();
     theater?.sound.setEnabled(on);
+    // Turning sound off switches the radio off too, so its dial isn't lit with nothing playing.
+    if (!on) theater?.setRadio(false);
   };
   renderSound();
 
@@ -114,6 +116,12 @@ export function boot() {
           onHover: (target) => {
             root.dataset.hover = target ?? "";
             updatePrompt();
+          },
+          // Switching the radio on turns sound on, so it can be heard.
+          onRadio: (on) => {
+            if (!on || soundOn) return;
+            setSound(true);
+            lobby?.setSound(true);
           },
           onProgramPage: (name, first, last) => renderView(name, first, last),
           onFrame: () => placePrompt(),
