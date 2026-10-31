@@ -10,6 +10,8 @@ as items. The room stays around the screen the whole time. See
 
 ## Run it
 
+Needs Node 22.12 or newer (Astro's minimum). The site is built with Node 24, which `.node-version` pins for hosts like Cloudflare Pages.
+
 ```bash
 npm install
 npm run dev
