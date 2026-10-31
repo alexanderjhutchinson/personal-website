@@ -199,8 +199,26 @@ export function mountContent(onOpen?: (key: string) => void) {
   if (!dialog) return null;
   const cards = dialog.querySelectorAll<HTMLElement>("[data-card]");
 
+  // Closing plays the opening backwards (the "closing" class in Reel.astro), then closes for real. The
+  // dialog stays open until then, so the page and the game keep ignoring keys. Opening a card meanwhile
+  // calls the close off. If the animation stalls (a page that isn't drawing), it closes anyway.
+  let closing = 0;
+  const close = () => {
+    if (!dialog.open || dialog.classList.contains("closing")) return;
+    const token = ++closing;
+    dialog.classList.add("closing");
+    const played = Promise.allSettled(dialog.getAnimations({ subtree: true }).map((a) => a.finished));
+    void Promise.race([played, new Promise((resolve) => setTimeout(resolve, 600))]).then(() => {
+      if (token !== closing) return;
+      dialog.classList.remove("closing");
+      dialog.close();
+    });
+  };
+
   // Cards are keyed "reel/item". The open card's item goes in the address, like /projects#speakeasy.
   const open = (key: string) => {
+    closing++;
+    dialog.classList.remove("closing");
     for (const card of cards) card.hidden = card.dataset.card !== key;
     if (!dialog.open) dialog.showModal();
     history.replaceState(history.state, "", `#${key.split("/")[1]}`);
@@ -211,9 +229,20 @@ export function mountContent(onOpen?: (key: string) => void) {
     const button = (e.target as Element | null)?.closest<HTMLElement>("[data-item]");
     if (button?.dataset.item) open(button.dataset.item);
   });
-  // Close with the button, Escape (built in), or a click outside the card.
+  // Close with the button, Escape, or a click outside the card.
   dialog.addEventListener("click", (e) => {
-    if (e.target === dialog || (e.target as Element).closest("[data-close]")) dialog.close();
+    if (e.target === dialog || (e.target as Element).closest("[data-close]")) close();
+  });
+  // Escape is caught as a key, since the browser only lets a page hold back its own close (the cancel
+  // event) after a fresh click. Cancel still covers other ways of closing, like a phone's back gesture.
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    close();
+  });
+  dialog.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    close();
   });
   dialog.addEventListener("close", () => {
     if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);

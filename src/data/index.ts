@@ -72,6 +72,8 @@ export interface ContentItem {
   name: string;
   /** One short line under the name in the panel. */
   sub: string;
+  /** On the card, the small line over the name: when, like the dates over each entry in the program. */
+  kicker?: string;
   /** Lines on the card, under the name. */
   lines: string[];
   groups?: { label: string; items: string[] }[];
@@ -88,7 +90,8 @@ export const reelItems: Record<ReelId, ContentItem[]> = {
       icon: "diploma",
       name: education.degree,
       sub: `${education.school} · ${education.year}`,
-      lines: [education.school, `${education.honours}, GPA ${education.gpa}`, education.year],
+      kicker: education.year,
+      lines: [education.school, `${education.honours}, GPA ${education.gpa}`],
     },
     {
       id: "skills",
@@ -115,11 +118,8 @@ export const reelItems: Record<ReelId, ContentItem[]> = {
     icon: job.icon ?? "briefcase",
     name: job.title,
     sub: `${job.company} · ${formatRange(job.start, job.end)}`,
-    lines: [
-      job.company,
-      job.location,
-      job.end ? `${formatRange(job.start, job.end)} (${months(job.start, job.end)})` : formatRange(job.start),
-    ],
+    kicker: job.end ? `${formatRange(job.start, job.end)} · ${months(job.start, job.end)}` : formatRange(job.start),
+    lines: [job.company, job.location],
   })),
   projects: projects.map((project) => ({
     id: project.id,
@@ -127,7 +127,8 @@ export const reelItems: Record<ReelId, ContentItem[]> = {
     icon: project.icon ?? "cog",
     name: project.name,
     sub: formatRange(project.start, project.end),
-    lines: [formatRange(project.start, project.end)],
+    kicker: formatRange(project.start, project.end),
+    lines: [],
     groups: [{ label: "Materials", items: project.stack }],
     links: project.links,
   })),
