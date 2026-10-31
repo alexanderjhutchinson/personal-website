@@ -37,10 +37,15 @@ const within = (b: Box, x: number, y: number) => x >= b.x && x < b.x + b.w && y 
 const SLOT = 20;
 const slotBox = (i: number): Box => ({ x: 4 + i * (SLOT + 1), y: 4, w: SLOT, h: SLOT });
 
-const PANEL_W = 132;
+// The reel's item panel: as wide as it can be beside the hotbar, so the content is hard to miss.
+const PANEL_W = 166;
 const PANEL_X = WIDTH - 4 - PANEL_W;
-const PANEL_PAD = 5;
-const ENTRY_ICON = 14;
+const PANEL_PAD = 6.5;
+const ENTRY_ICON = 18;
+const NAME_LINE = 7.2;
+const SUB_LINE = 5.6;
+/** Seconds the panel glows after a new reel starts, to point out that the content changed. */
+const GLOW_TIME = 3.5;
 
 function spaced(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, align: "left" | "center") {
   const chars = [...text];
@@ -104,7 +109,7 @@ export class Overlay {
     ctx.save();
     ctx.scale(SCALE, SCALE);
     ctx.textBaseline = "alphabetic";
-    this.drawPanel(ctx, reel);
+    this.drawPanel(ctx, reel, now);
     this.drawHotbar(ctx);
     this.drawTooltip(ctx);
     this.drawTitle(ctx, now);
@@ -183,47 +188,53 @@ export class Overlay {
   }
 
   /** The reel's items, in the room's style: a dark card with a double rule, a title-card heading, and the items. */
-  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel) {
+  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel, now: number) {
     const items = reelItems[reel.id];
-    const textX = PANEL_X + PANEL_PAD + ENTRY_ICON + 4;
+    const textX = PANEL_X + PANEL_PAD + ENTRY_ICON + 5;
     const textW = PANEL_X + PANEL_W - PANEL_PAD - textX;
 
     // Lay out first, to know the height.
-    ctx.font = `600 4.8px ${BODY}`;
     const rows = items.map((item) => {
-      ctx.font = `600 4.8px ${BODY}`;
+      ctx.font = `600 6.2px ${BODY}`;
       const name = wrap(ctx, item.name, textW);
-      ctx.font = `400 3.6px ${MONO}`;
+      ctx.font = `400 4.5px ${MONO}`;
       const sub = wrap(ctx, item.sub, textW);
-      const h = Math.max(ENTRY_ICON + 2, name.length * 5.6 + sub.length * 4.6 + 3);
+      const h = Math.max(ENTRY_ICON + 3, name.length * NAME_LINE + sub.length * SUB_LINE + 4);
       return { item, name, sub, h };
     });
     const top = 4;
-    const headH = 18;
-    const height = PANEL_PAD + headH + rows.reduce((n, r) => n + r.h + 1.5, 0) + PANEL_PAD - 1.5;
+    const headH = 24;
+    const height = PANEL_PAD + headH + rows.reduce((n, r) => n + r.h + 2, 0) + PANEL_PAD - 2;
     this.panel = { x: PANEL_X, y: top, w: PANEL_W, h: height };
 
+    // For a few seconds after a reel starts, the panel glows amber.
+    const since = this.title?.reel.id === reel.id ? now - this.title.start : Infinity;
+    const glow = since < GLOW_TIME ? (1 - since / GLOW_TIME) * (0.6 + 0.4 * Math.sin(since * 7)) : 0;
+    ctx.shadowColor = `rgba(224, 163, 58, ${0.7 * glow})`;
+    ctx.shadowBlur = 10 * SCALE * glow;
     ctx.fillStyle = PANEL_BG;
     ctx.fillRect(PANEL_X, top, PANEL_W, height);
-    ctx.lineWidth = 0.35;
-    ctx.strokeStyle = "rgba(236, 225, 201, 0.45)";
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 0.4 + 0.5 * glow;
+    ctx.strokeStyle = glow ? `rgba(224, 163, 58, ${0.5 + 0.5 * glow})` : "rgba(236, 225, 201, 0.45)";
     ctx.strokeRect(PANEL_X + 0.2, top + 0.2, PANEL_W - 0.4, height - 0.4);
+    ctx.lineWidth = 0.35;
     ctx.strokeStyle = "rgba(224, 163, 58, 0.3)";
-    ctx.strokeRect(PANEL_X + 1.6, top + 1.6, PANEL_W - 3.2, height - 3.2);
+    ctx.strokeRect(PANEL_X + 1.8, top + 1.8, PANEL_W - 3.6, height - 3.6);
 
     ctx.fillStyle = AMBER;
-    ctx.font = `500 3.4px ${MONO}`;
-    spaced(ctx, `REEL ${reel.number}`, PANEL_X + PANEL_PAD, top + PANEL_PAD + 3.6, 0.8, "left");
+    ctx.font = `500 4.3px ${MONO}`;
+    spaced(ctx, `REEL ${reel.number}`, PANEL_X + PANEL_PAD, top + PANEL_PAD + 4.5, 1.1, "left");
     ctx.fillStyle = INK;
-    ctx.font = `500 7.5px ${DISPLAY}`;
+    ctx.font = `500 10px ${DISPLAY}`;
     ctx.textAlign = "left";
-    ctx.fillText(reel.title, PANEL_X + PANEL_PAD, top + PANEL_PAD + 12.5);
+    ctx.fillText(reel.title, PANEL_X + PANEL_PAD, top + PANEL_PAD + 16);
 
     this.entries = [];
     let y = top + PANEL_PAD + headH;
     for (const row of rows) {
       const key = `${reel.id}/${row.item.id}`;
-      const box = { x: PANEL_X + PANEL_PAD - 1.5, y: y - 1, w: PANEL_W - 2 * PANEL_PAD + 3, h: row.h + 1 };
+      const box = { x: PANEL_X + PANEL_PAD - 2, y: y - 1, w: PANEL_W - 2 * PANEL_PAD + 4, h: row.h + 1 };
       this.entries.push({ box, key });
       if (this.hover?.kind === "item" && this.hover.key === key) {
         ctx.fillStyle = "rgba(224, 163, 58, 0.12)";
@@ -237,22 +248,22 @@ export class Overlay {
       ctx.strokeStyle = "rgba(185, 170, 141, 0.5)";
       ctx.strokeRect(PANEL_X + PANEL_PAD + 0.2, iconY + 0.2, ENTRY_ICON - 0.4, ENTRY_ICON - 0.4);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(contentIcon(row.item.icon), PANEL_X + PANEL_PAD + 1, iconY + 1, 12, 12);
+      ctx.drawImage(contentIcon(row.item.icon), PANEL_X + PANEL_PAD + 1, iconY + 1, 16, 16);
 
-      let ty = y + (row.h - (row.name.length * 5.6 + row.sub.length * 4.6)) / 2 + 4.2;
-      ctx.font = `600 4.8px ${BODY}`;
+      let ty = y + (row.h - (row.name.length * NAME_LINE + row.sub.length * SUB_LINE)) / 2 + 5.4;
+      ctx.font = `600 6.2px ${BODY}`;
       ctx.fillStyle = ITEM_TYPES[row.item.type].color;
       for (const line of row.name) {
         ctx.fillText(line, textX, ty);
-        ty += 5.6;
+        ty += NAME_LINE;
       }
-      ctx.font = `400 3.6px ${MONO}`;
+      ctx.font = `400 4.5px ${MONO}`;
       ctx.fillStyle = INK_DIM;
       for (const line of row.sub) {
         ctx.fillText(line, textX, ty - 0.6);
-        ty += 4.6;
+        ty += SUB_LINE;
       }
-      y += row.h + 1.5;
+      y += row.h + 2;
     }
   }
 
