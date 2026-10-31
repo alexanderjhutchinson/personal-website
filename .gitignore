@@ -12,9 +12,14 @@ npm-debug.log*
 # original photos for the pin board, at the top level only (the web copies in public/photos ship)
 /Photos/
 
-# environment variables
+# environment variables and Wrangler's local secrets
 .env
-.env.production
+.env.*
+!.env.example
+.dev.vars*
+
+# the LinkedIn thumbnail, kept here but not part of the site
+/linkedin-thumbnail.jpg
 
 # local editor and tool settings
 .DS_Store
