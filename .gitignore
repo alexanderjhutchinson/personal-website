@@ -9,6 +9,9 @@ node_modules/
 # logs
 npm-debug.log*
 
+# original photos for the pin board, at the top level only (the web copies in public/photos ship)
+/Photos/
+
 # environment variables
 .env
 .env.production

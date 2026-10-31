@@ -131,12 +131,16 @@ button {
 
 /* Page modes, set on <html data-mode>. Without JavaScript there is no mode and the resume shows on its own. */
 html[data-mode="room"],
+html[data-mode="board"],
+html[data-mode="photo"],
 html[data-mode="playing"],
 html[data-mode="ending"] {
   overflow: hidden;
 }
 
 html[data-mode="room"] body,
+html[data-mode="board"] body,
+html[data-mode="photo"] body,
 html[data-mode="playing"] body,
 html[data-mode="ending"] body {
   overflow: hidden;

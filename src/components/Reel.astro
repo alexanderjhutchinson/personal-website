@@ -151,7 +151,7 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     pointer-events: none;
   }
 
-  :global(html:is([data-mode="room"], [data-mode="program"], [data-mode="playing"], [data-mode="ending"])) .reel-layer {
+  :global(html:is([data-mode="room"], [data-mode="program"], [data-mode="board"], [data-mode="photo"], [data-mode="playing"], [data-mode="ending"])) .reel-layer {
     opacity: 0;
     visibility: hidden;
     transition:

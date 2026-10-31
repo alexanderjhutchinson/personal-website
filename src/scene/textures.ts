@@ -3,7 +3,7 @@ import { palette } from "./palette";
 import { rng } from "./random";
 
 // Every surface in the room is painted on a canvas at load time, so the scene
-// ships with no image files.
+// ships with no image files, except the photos on the pin board (drawn into their prints here).
 
 export const FONT_DISPLAY = '"Fraunces Variable", Georgia, serif';
 export const FONT_BODY = '"Instrument Sans Variable", "Helvetica Neue", Arial, sans-serif';
@@ -405,6 +405,124 @@ export function snakeLeaf() {
     for (let x = 7; x <= W - 7; x += 6) ctx.lineTo(x, y + Math.sin(x * 0.3 + y) * 3);
     ctx.stroke();
   }
+  const t = texture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Cork for the pin board: tan, with darker and lighter granules. */
+export function cork(repeat: [number, number]) {
+  const S = 512;
+  const r = rng(61);
+  const { c, ctx } = canvas(S, S);
+  ctx.fillStyle = "#b07f4a";
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 16000; i++) {
+    const dark = r() < 0.55;
+    ctx.fillStyle = dark ? `rgba(84, 50, 22, ${0.12 + r() * 0.35})` : `rgba(228, 190, 132, ${0.1 + r() * 0.3})`;
+    const s = 1 + r() * 3;
+    ctx.fillRect(r() * S, r() * S, s, s * (0.5 + r() * 0.6));
+  }
+  return texture(c, { repeat });
+}
+
+/** A cinema ticket stub, pinned to the board. */
+export function ticket() {
+  const W = 256;
+  const H = 112;
+  const { c, ctx } = canvas(W, H);
+  ctx.fillStyle = "#d77a3e";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = palette.cream;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+  ctx.setLineDash([4, 5]);
+  ctx.beginPath();
+  ctx.moveTo(56, 10);
+  ctx.lineTo(56, H - 10);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = palette.cream;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `600 26px ${FONT_MONO}`;
+  ctx.fillText("ADMIT ONE", 152, 48);
+  ctx.font = `500 13px ${FONT_MONO}`;
+  ctx.fillText("THE LATE SHOW", 152, 78);
+  ctx.save();
+  ctx.translate(33, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font = `500 14px ${FONT_MONO}`;
+  ctx.fillText("No 0418", 0, 0);
+  ctx.restore();
+  const t = texture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** A print's shape: its width over its height, and where the picture sits on it as fractions from the top left. */
+export interface PrintLayout {
+  aspect: number;
+  picture: { x: number; y: number; w: number; h: number };
+}
+
+/** Faded, warm and soft, like a print back from the drugstore lab: lifted blacks, a vignette, and grain. */
+function fadePrint(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = "rgba(72, 46, 26, 0.38)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "#ffe7c4";
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+  const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.6);
+  v.addColorStop(0, "rgba(30, 15, 5, 0)");
+  v.addColorStop(1, "rgba(30, 15, 5, 0.32)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  const r = rng(71);
+  const dot = Math.max(1, w / 500);
+  for (let i = 0; i < (w * h) / 24; i++) {
+    ctx.fillStyle = r() < 0.5 ? "rgba(0, 0, 0, 0.07)" : "rgba(255, 240, 220, 0.06)";
+    ctx.fillRect(r() * w, r() * h, dot, dot);
+  }
+}
+
+/**
+ * A photo print: the picture inside a white border. longSide is the print's long side in pixels, so the
+ * same print can be painted small for the board and sharp for holding up. Until the photo has loaded,
+ * the picture's place is dark.
+ */
+export function print(photo: HTMLImageElement | null, layout: PrintLayout, longSide: number) {
+  const W = Math.round(layout.aspect >= 1 ? longSide : longSide * layout.aspect);
+  const H = Math.round(layout.aspect >= 1 ? longSide / layout.aspect : longSide);
+  const { c, ctx } = canvas(W, H);
+  const paper = ctx.createLinearGradient(0, 0, 0, H);
+  paper.addColorStop(0, "#f2ecdd");
+  paper.addColorStop(1, "#e6dcc6");
+  ctx.fillStyle = paper;
+  ctx.fillRect(0, 0, W, H);
+  const { x, y, w, h } = layout.picture;
+  const pw = w * W;
+  const ph = h * H;
+  ctx.save();
+  ctx.translate(Math.round(x * W), Math.round(y * H));
+  ctx.beginPath();
+  ctx.rect(0, 0, Math.round(pw), Math.round(ph));
+  ctx.clip();
+  if (photo) {
+    // Fill the picture's place, trimming a sliver off the photo if their shapes differ a hair.
+    const scale = Math.max(pw / photo.naturalWidth, ph / photo.naturalHeight);
+    const dw = photo.naturalWidth * scale;
+    const dh = photo.naturalHeight * scale;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(photo, (pw - dw) / 2, (ph - dh) / 2, dw, dh);
+  } else {
+    ctx.fillStyle = "#2a231e";
+    ctx.fillRect(0, 0, pw, ph);
+  }
+  fadePrint(ctx, pw, ph);
+  ctx.restore();
   const t = texture(c);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;

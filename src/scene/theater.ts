@@ -8,9 +8,10 @@ import type { ReelId } from "../data";
 import { HEIGHT as GAME_HEIGHT, WIDTH as GAME_WIDTH } from "../lobby/config";
 import { paintReelStill } from "../lobby/still";
 import { buildBeam, buildRoomDust, type Beam } from "./beam";
+import { buildBoard, type Board, type BoardPhoto } from "./board";
 import { COUNT_STEP, Film } from "./film";
 import { createFilmPass } from "./filmPass";
-import { COUCH, IMAGE, PROGRAM, PROJECTOR, REEL_VIEW, SCREEN, reelRect } from "./layout";
+import { BOARD, COUCH, IMAGE, PROGRAM, PROJECTOR, REEL_VIEW, SCREEN, reelRect } from "./layout";
 import { palette } from "./palette";
 import { buildProgram, PAPER, type ProgramPaper } from "./program";
 import type { RegionAction } from "./programPages";
@@ -24,12 +25,17 @@ import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures
 /**
  * - idle: the room, lamp on, waiting for the projector to be started
  * - program: the program is picked up and held in front of the camera
+ * - board: the camera has gone over to the pin board and faces it
+ * - photo: a photo is off the pin board and held in front of the camera
  * - playing: the start sequence is running
  * - entering: the camera has reached the screen and the reel is fading in over it
  * - reel: a reel is playing on the screen, drawn into the room as the screen's picture
  * - ending: the ending sequence is running
  */
-export type Mode = "idle" | "program" | "playing" | "entering" | "reel" | "ending";
+export type Mode = "idle" | "program" | "board" | "photo" | "playing" | "entering" | "reel" | "ending";
+
+/** In the room, not watching the film: the room's own pace, and the radio at full volume. */
+const onTheCouch = (mode: Mode) => mode === "idle" || mode === "program" || mode === "board" || mode === "photo";
 
 export type HoverTarget = "projector" | "program" | "fixture" | null;
 
@@ -108,12 +114,15 @@ interface SceneState {
   focus: number;
   /** The live reel on the screen: 0 hidden, 1 showing. */
   reel: number;
+  /** The camera: 0 on the couch, 1 in front of the pin board. */
+  board: number;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
 const tablePos = new THREE.Vector3();
 const tableQuat = new THREE.Quaternion();
 const heldPos = new THREE.Vector3();
+const toPhoto = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const up = new THREE.Vector3();
 const right = new THREE.Vector3();
@@ -153,6 +162,8 @@ export interface TheaterOptions {
   onRadio?: (on: boolean) => void;
   /** The held program turned to another view; first and last say whether it can turn further. */
   onProgramPage: (name: string, first: boolean, last: boolean) => void;
+  /** A photo came off the pin board: where it is in the board's order. */
+  onPhoto: (index: number, count: number) => void;
   /** Called after every rendered frame. */
   onFrame?: () => void;
 }
@@ -175,6 +186,7 @@ export class Theater {
   private roomDust!: ReturnType<typeof buildRoomDust>;
   private film!: Film;
   private program!: ProgramPaper;
+  private board!: Board;
   private veil!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private picture: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; texture: THREE.CanvasTexture } | null =
     null;
@@ -200,9 +212,15 @@ export class Theater {
     flip: 0,
     focus: 0,
     reel: 0,
+    board: 0,
   };
   private tl: gsap.core.Timeline | null = null;
   private paperTl: gsap.core.Timeline | null = null;
+  /** The photo off the pin board, while the mode is "photo", and the timeline moving photos on or off it. */
+  private heldPhoto: BoardPhoto | null = null;
+  private photoTl: gsap.core.Timeline | null = null;
+  /** How far the program or a photo is held up, 0 to 1: the camera settles and the room dims behind it. */
+  private inHand = 0;
   private view = 0;
   private paperHover = 0;
   private glint = 0;
@@ -221,6 +239,8 @@ export class Theater {
   private hover = 0;
   private hovering: HoverTarget = null;
   private fixtures: Fixture[] = [];
+  /** The pin board's photos, which can be clicked once the camera is at the board. */
+  private photoFixtures: Fixture[] = [];
   /** The fixture under the pointer, while hovering is "fixture". */
   private fixture: Fixture | null = null;
   /** Which way each lamp's switch was last flipped (its light may still be fading). */
@@ -270,6 +290,8 @@ export class Theater {
     scene.add(this.room.group);
     const { lamp, accent, fill, radio } = this.room;
     this.warmFill = { sky: fill.color.clone(), ground: fill.groundColor.clone() };
+    this.board = buildBoard();
+    scene.add(this.board.group);
     this.fixtures = [
       this.lampSwitch("tableLamp", lamp.hitTargets, (level) => (lamp.base.emissiveIntensity = level * 0.18)),
       this.lampSwitch("poleLamp", accent.hitTargets, (level) => (accent.shades.emissiveIntensity = level * 0.25)),
@@ -284,7 +306,20 @@ export class Theater {
           this.setRadio(on);
         },
       },
+      // From the couch the board is one thing: a click goes over to it.
+      {
+        targets: this.board.hitTargets,
+        highlight: (level) => this.board.highlight(level),
+        hover: 0,
+        click: () => void this.lookAtBoard(),
+      },
     ];
+    this.photoFixtures = this.board.photos.map((photo, i) => ({
+      targets: [photo.mesh],
+      highlight: (level) => (photo.hover = level),
+      hover: 0,
+      click: () => this.holdPhoto(i),
+    }));
 
     this.projector = buildProjector(PROJECTOR.position, SCREEN.center);
     scene.add(this.projector.group);
@@ -385,16 +420,31 @@ export class Theater {
     return { action: this.program.actionAt(hit), side: clientX < rect.left + rect.width / 2 ? -1 : 1 };
   }
 
+  /** Which half of the held photo a click lands on (-1 left, 1 right), or null if it misses the photo. */
+  photoHit(clientX: number, clientY: number): -1 | 1 | null {
+    if (!this.heldPhoto || !this.raycast(clientX, clientY, [this.heldPhoto.mesh]).length) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    return clientX < rect.left + rect.width / 2 ? -1 : 1;
+  }
+
   /** Click the fixture at this client position, if there is one. */
   clickFixture(clientX: number, clientY: number) {
     this.fixtureAt(clientX, clientY)?.click();
   }
 
+  /** A click while at the pin board: a photo comes off it, and a click off the board goes back to the couch. */
+  clickBoard(clientX: number, clientY: number) {
+    if (this.mode !== "board") return;
+    const photo = this.fixtureAt(clientX, clientY, this.photoFixtures);
+    if (photo) photo.click();
+    else if (!this.raycast(clientX, clientY, this.board.hitTargets).length) void this.leaveBoard();
+  }
+
   /** The nearest fixture under this client position. */
-  private fixtureAt(clientX: number, clientY: number) {
+  private fixtureAt(clientX: number, clientY: number, fixtures = this.fixtures) {
     let nearest: Fixture | null = null;
     let distance = Infinity;
-    for (const f of this.fixtures) {
+    for (const f of fixtures) {
       const hit = this.raycast(clientX, clientY, f.targets)[0];
       if (hit && hit.distance < distance) {
         nearest = f;
@@ -521,6 +571,108 @@ export class Theater {
     } else {
       tl.to(s, { open: to.open, focus: to.focus, duration: this.quick(0.6), ease });
     }
+  }
+
+  /**
+   * Go over to the pin board: the camera leaves the couch and comes to face it, close enough to
+   * pick out a photo. Resolves once it's there.
+   */
+  lookAtBoard(): Promise<void> {
+    if (this.mode !== "idle") return Promise.resolve();
+    this.setMode("board");
+    this.setHovering(null);
+    return new Promise((resolve) => {
+      gsap.to(this.state, {
+        board: 1,
+        duration: this.quick(1.1),
+        ease: "power2.inOut",
+        overwrite: "auto",
+        onComplete: resolve,
+        onInterrupt: resolve,
+      });
+    });
+  }
+
+  /** Back to the couch from the pin board. The room is the couch's again at once; resolves once the camera is back. */
+  leaveBoard(): Promise<void> {
+    if (this.mode !== "board") return Promise.resolve();
+    this.setMode("idle");
+    this.setHovering(null);
+    return new Promise((resolve) => {
+      gsap.to(this.state, {
+        board: 0,
+        duration: this.quick(1),
+        ease: "power2.inOut",
+        overwrite: "auto",
+        onComplete: resolve,
+        onInterrupt: resolve,
+      });
+    });
+  }
+
+  /** Back to the couch from wherever the pin board has taken the visitor: the photo goes back up, then the camera comes away. */
+  async toCouch() {
+    await this.pinBack();
+    await this.leaveBoard();
+  }
+
+  /** At the pin board, take a photo off it and hold it up to the camera: the board's first, or this one (from the end if negative). */
+  holdPhoto(index = 0) {
+    const photo = this.board.photos.at(index);
+    if (this.mode !== "board" || !photo) return;
+    this.setMode("photo");
+    this.setHovering(null);
+    this.liftPhoto(photo, null);
+  }
+
+  /** The next or previous photo on the board: the one in hand goes back on its pin as that one comes off. */
+  browse(dir: -1 | 1) {
+    if (this.mode !== "photo" || !this.heldPhoto || this.photoTl) return;
+    const photos = this.board.photos;
+    this.liftPhoto(photos[(photos.indexOf(this.heldPhoto) + dir + photos.length) % photos.length], this.heldPhoto);
+  }
+
+  private liftPhoto(photo: BoardPhoto, from: BoardPhoto | null) {
+    const photos = this.board.photos;
+    this.heldPhoto = photo;
+    this.board.sharpen(photo, true);
+    this.opts.onPhoto(photos.indexOf(photo), photos.length);
+    this.sound.pin();
+    this.sound.rustle(0.4);
+    this.photoTl?.kill();
+    const tl = gsap.timeline({
+      onComplete: () => {
+        this.photoTl = null;
+        for (const p of photos) if (p !== photo) this.board.sharpen(p, false);
+      },
+    });
+    this.photoTl = tl;
+    const ease = "power2.inOut";
+    if (from) tl.to(from, { lift: 0, duration: this.quick(0.7), ease }, 0);
+    tl.to(photo, { lift: 1, duration: this.quick(0.8), ease }, from ? this.quick(0.12) : 0);
+  }
+
+  /** Pin the photo in hand back on the board, and look at the board again. Resolves once it's back. */
+  pinBack(): Promise<void> {
+    if (this.mode !== "photo") return Promise.resolve();
+    this.photoTl?.kill();
+    const photos = this.board.photos;
+    this.sound.rustle(0.3);
+    return new Promise((resolve) => {
+      const tl = gsap.timeline({
+        onComplete: () => {
+          this.photoTl = null;
+          this.heldPhoto = null;
+          for (const p of photos) this.board.sharpen(p, false);
+          this.sound.pin();
+          this.setMode("board");
+          resolve();
+        },
+      });
+      this.photoTl = tl;
+      // Any photo still on its way back from browsing goes back too.
+      for (const p of photos) if (p.lift > 0) tl.to(p, { lift: 0, duration: this.quick(0.7), ease: "power2.inOut" }, 0);
+    });
   }
 
   /**
@@ -723,7 +875,7 @@ export class Theater {
   private setMode(mode: Mode) {
     this.mode = mode;
     // The radio turns down while the film runs.
-    this.sound.duckRadio(mode !== "idle" && mode !== "program");
+    this.sound.duckRadio(!onTheCouch(mode));
     this.opts.onMode(mode);
   }
 
@@ -752,6 +904,13 @@ export class Theater {
     } else if (this.mode === "program") {
       // The pointer shows over the paper (turn the page, follow a reel or link); off it, a click puts it down.
       this.canvas.style.cursor = this.hitsProgram(e.clientX, e.clientY) ? "pointer" : "";
+    } else if (this.mode === "board") {
+      // At the board, each photo brightens under the pointer.
+      const photo = this.fixtureAt(e.clientX, e.clientY, this.photoFixtures);
+      this.setHovering(photo ? "fixture" : null, photo);
+    } else if (this.mode === "photo") {
+      // Over the photo, a click goes to the next or previous one; off it, a click pins it back.
+      this.canvas.style.cursor = this.photoHit(e.clientX, e.clientY) !== null ? "pointer" : "";
     }
   }
 
@@ -795,8 +954,8 @@ export class Theater {
   }
 
   private get frameRate() {
-    if (this.mode !== "idle" && this.mode !== "program") return MOVING_RATE;
-    const moving = gsap.isTweening(this.state) || performance.now() - this.lastInput < SETTLE_MS;
+    if (!onTheCouch(this.mode)) return MOVING_RATE;
+    const moving = gsap.isTweening(this.state) || !!this.photoTl || performance.now() - this.lastInput < SETTLE_MS;
     return moving ? MOVING_RATE : STILL_RATE;
   }
 
@@ -878,15 +1037,27 @@ export class Theater {
     return { eye, look, fov };
   }
 
+  /** In front of the pin board, square on, close enough that it fills most of the view, at the couch's field of view. */
+  private boardPose(aspect: number, fov: number) {
+    const tan = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+    const d = Math.max(BOARD.height / (0.78 * 2 * tan), BOARD.width / (0.86 * 2 * tan * aspect));
+    const look = BOARD.center.clone();
+    const eye = look.clone().add(new THREE.Vector3(0, 0, d));
+    return { eye, look };
+  }
+
   private applyCamera() {
     const aspect = this.size.w / this.size.h;
     const a = this.couchPose(aspect);
     const b = this.reelPose(aspect);
+    const p = this.boardPose(aspect, a.fov);
     const c = this.state.cam;
-    const eye = a.eye.clone().lerp(b.eye, c);
-    const look = a.look.clone().lerp(b.look, c);
-    // Small parallax and breathing while sitting on the couch, calmer while reading the program.
-    const still = this.opts.reducedMotion ? 0 : (1 - c) * (1 - 0.85 * this.state.paper);
+    const at = this.state.board;
+    const eye = a.eye.clone().lerp(b.eye, c).lerp(p.eye, at);
+    const look = a.look.clone().lerp(b.look, c).lerp(p.look, at);
+    // Small parallax and breathing while sitting on the couch, calmer at the board or while holding the
+    // program or a photo.
+    const still = this.opts.reducedMotion ? 0 : (1 - c) * (1 - 0.85 * Math.max(this.inHand, at));
     eye.x += this.parallax.x * 0.08 * still + Math.sin(this.time * 0.35) * 0.006 * still;
     eye.y += this.parallax.y * 0.04 * still + Math.sin(this.time * 0.5) * 0.004 * still;
     this.camera.position.copy(eye);
@@ -903,6 +1074,7 @@ export class Theater {
     const ease = 1 - Math.exp(-dt * 10);
     this.hover += ((this.hovering === "projector" ? 1 : 0) - this.hover) * ease;
     this.paperHover += ((this.hovering === "program" ? 1 : 0) - this.paperHover) * ease;
+    this.inHand = Math.max(s.paper, ...this.board.photos.map((p) => p.lift));
 
     // Lamps: the house lights, times each lamp's own switch.
     const table = s.lamp * s.tableLamp;
@@ -920,7 +1092,7 @@ export class Theater {
     fill.color.copy(this.warmFill.sky).lerp(NIGHT_SKY, 1 - lit);
     fill.groundColor.copy(this.warmFill.ground).lerp(NIGHT_GROUND, 1 - lit);
     fill.intensity = 0.15 + s.lamp * (0.35 + 0.4 * lit);
-    for (const f of this.fixtures) {
+    for (const f of [...this.fixtures, ...this.photoFixtures]) {
       f.hover += ((this.fixture === f ? 1 : 0) - f.hover) * ease;
       f.highlight(f.hover);
     }
@@ -942,8 +1114,9 @@ export class Theater {
     // the lamp and the lens spill don't wash out the dark parts of the image.
     this.room.screen.material.color.setScalar(1 - 0.94 * s.screen);
     this.room.screen.material.emissiveIntensity = s.screen * lerp(1.2, 0.85, s.cam);
-    // Bloom would blur the print, so it drops while the program is held up.
-    this.bloom.strength = lerp(lerp(0.55, 0.22, s.cam), 0.05, s.paper);
+    // Bloom would blur the print, so it drops while the program or a photo is held up, and most of
+    // the way at the pin board, where the pole lamp is close enough to make the prints glow.
+    this.bloom.strength = lerp(lerp(0.55, 0.22, s.cam), 0.05, Math.max(this.inHand, 0.7 * s.board));
     this.screenLight.intensity = s.screen * (0.15 + b) * 4.5;
     this.spot.intensity = s.screen * (0.3 + 0.7 * b) * 18;
     this.beam.update(drift, s.beam, b);
@@ -958,7 +1131,9 @@ export class Theater {
     u.uVignette.value = lerp(0.42, 0.2, s.cam);
 
     this.applyCamera();
-    this.placeProgram();
+    const paperAt = this.placeProgram();
+    const photoAt = this.placePhotos();
+    this.placeVeil(paperAt ?? photoAt, this.inHand);
 
     // The live reel on the screen, refreshed every frame while it shows.
     if (this.picture) {
@@ -969,8 +1144,11 @@ export class Theater {
     }
   }
 
-  /** Stand the program on the table, or hold it in front of the camera, or somewhere in between. */
-  private placeProgram() {
+  /**
+   * Stand the program on the table, or hold it in front of the camera, or somewhere in between.
+   * Returns how far in front of the camera it's held, or null while it stands on the table.
+   */
+  private placeProgram(): number | null {
     const s = this.state;
     const cam = this.camera;
     const { group } = this.program;
@@ -987,8 +1165,7 @@ export class Theater {
     if (s.paper <= 0) {
       group.position.copy(tablePos);
       group.quaternion.copy(tableQuat);
-      this.veil.visible = false;
-      return;
+      return null;
     }
 
     // Held close enough to fill most of the view: one page by its height (or width, on a phone), the open
@@ -1013,13 +1190,57 @@ export class Theater {
     // A little lift on the way up, so it's picked up rather than slid.
     group.position.lerpVectors(tablePos, heldPos, s.paper).addScaledVector(UP, Math.sin(Math.PI * s.paper) * 0.06);
     group.quaternion.slerpQuaternions(tableQuat, cam.quaternion, s.paper);
+    return d;
+  }
 
+  /**
+   * Pin each photo to the board, or hold it in front of the camera, or somewhere in between.
+   * Returns how far in front of the camera the photos off the board are held, or null with none off it.
+   */
+  private placePhotos(): number | null {
+    const cam = this.camera;
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    forward.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    let heldAt: number | null = null;
+    for (const p of this.board.photos) {
+      const { mesh, home } = p;
+      // On the board it brightens a little under the pointer, or with the whole board from the couch;
+      // held up, it's lit to see.
+      mesh.material.emissiveIntensity = lerp(0.22 * Math.max(p.hover, this.board.hover), 0.92, p.lift);
+      if (p.lift <= 0) {
+        mesh.position.copy(home.position);
+        mesh.position.z += 0.008 * p.hover;
+        mesh.quaternion.copy(home.quaternion);
+        continue;
+      }
+      // Held close enough to fill most of the view, a little above the controls.
+      const d = Math.max(p.height / (0.72 * 2 * tan), p.width / (0.86 * 2 * tan * cam.aspect));
+      heldPos.copy(cam.position).addScaledVector(forward, d).addScaledVector(up, 2 * d * tan * 0.04);
+      // Come in so its size on screen grows evenly, rather than all at the end: lerp the
+      // inverse of its depth, then find how far along the way that depth is.
+      const far = toPhoto.copy(home.position).sub(cam.position).dot(forward);
+      const depth = 1 / lerp(1 / far, 1 / d, p.lift);
+      mesh.position.lerpVectors(home.position, heldPos, (far - depth) / (far - d));
+      mesh.quaternion.slerpQuaternions(home.quaternion, cam.quaternion, p.lift);
+      // While one goes back as the next comes off, the veil stays behind both.
+      heldAt = Math.max(heldAt ?? 0, d);
+    }
+    return heldAt;
+  }
+
+  /** Dim the room just behind whatever is held up, as far as it's held up. */
+  private placeVeil(d: number | null, level: number) {
+    this.veil.visible = d !== null && level > 0;
+    if (d === null) return;
+    const cam = this.camera;
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
     const vd = d + 0.04;
     const vh = 2 * vd * tan * 1.3;
+    forward.set(0, 0, -1).applyQuaternion(cam.quaternion);
     this.veil.position.copy(cam.position).addScaledVector(forward, vd);
     this.veil.quaternion.copy(cam.quaternion);
     this.veil.scale.set(vh * cam.aspect, vh, 1);
-    this.veil.material.opacity = 0.62 * s.paper;
-    this.veil.visible = true;
+    this.veil.material.opacity = 0.62 * level;
   }
 }

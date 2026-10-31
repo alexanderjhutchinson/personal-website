@@ -4,8 +4,8 @@ import { Radio } from "./radio";
  * Projector sounds synthesized with the Web Audio API: the switch, the motor
  * spinning up, the film clattering through the gate, the countdown's 2-pop,
  * and the tail of the film flapping on the reel. Also the paper, the lamp
- * switches and the radio's knob. No audio files, except the radio's record
- * (radio.ts).
+ * switches, the radio's knob and the pin board's pins. No audio files, except
+ * the radio's record (radio.ts).
  */
 export class ProjectorSound {
   enabled = false;
@@ -129,6 +129,13 @@ export class ProjectorSound {
     const t = ctx.currentTime;
     this.tick(t, 0.5, 2800);
     this.tick(t + 0.035, 0.22, 4200);
+  }
+
+  /** A pushpin coming out of the cork, or going back in: a tiny, high click. */
+  pin() {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    this.tick(ctx.currentTime, 0.3, 5200);
   }
 
   /** The radio's knob: a dull, chunky click. */
