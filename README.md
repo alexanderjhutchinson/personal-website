@@ -10,7 +10,7 @@ as items. The room stays around the screen the whole time. See
 
 ## Run it
 
-Needs Node 22.12 or newer (Astro's minimum). The site is built with Node 24, which `.node-version` pins for hosts like Cloudflare Pages.
+Needs Node 22.12 or newer (Astro's minimum). The site is built with Node 24, which `.node-version` pins for the host's build too.
 
 ```bash
 npm install
@@ -20,6 +20,14 @@ npm run dev
 Then open http://localhost:4321.
 
 `npm run build` type-checks and builds the static site into `dist/`. `npm run preview` serves that build.
+
+## Hosting
+
+Cloudflare Workers serves `dist/` as static files; there's no server code. [wrangler.jsonc](wrangler.jsonc) is the whole setup. Its `name` has to match the project's name in the Cloudflare dashboard. Every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`), and other branches get preview builds.
+
+Addresses have no trailing slash: `/about/` redirects to `/about`, which matches the addresses the room writes into the browser history.
+
+To try the hosted setup locally, build first, then run `npx wrangler dev`.
 
 ## Where things live
 

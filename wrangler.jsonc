@@ -1,0 +1,12 @@
+// Cloudflare Workers: serves the built site (dist/) as static files, no server code.
+// "name" has to match the project name in the Cloudflare dashboard.
+{
+  "name": "personal-website",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Every address is written without a trailing slash (/about, /program),
+    // so serve /about from about/index.html and send /about/ to /about.
+    "html_handling": "drop-trailing-slash"
+  }
+}
