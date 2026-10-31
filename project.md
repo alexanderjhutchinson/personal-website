@@ -10,8 +10,8 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 - **One room** (merged in #4, see "One room" below): the reels play on the room's screen instead of on pages of their own.
 - **Performance** (merged in #5, see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
-- **Nothing is deployed yet.**
-- **Next:** the room extras (see "Room extras" below): a pin board, lamps, a radio, magazines and film cans.
+- **Deployed** (#6 to #8): Cloudflare Workers serves the site at alexanderjhutchinson.com, and every push to `main` deploys it.
+- **Room extras** (see "Room extras" below): the lamps switch off and on. Next: the pin board, then a radio, magazines and film cans.
 
 ## Why it matters
 
@@ -72,7 +72,7 @@ Needs your review:
   - real phones, Safari and Firefox (only Chromium was tested)
   - the reduced-motion path, which I checked by reading the code but couldn't switch on in the test browser
 - [ ] **Page weight.** The 3D scene is about 300 KB gzipped. It loads after the page, so the program's text is never blocked, but the room takes a moment on slow connections.
-- [ ] **Not deployed.** Hosting needs your accounts.
+- [x] **Deployed** on Cloudflare Workers at alexanderjhutchinson.com (#6 to #8).
 - [ ] **`npm audit` flags two advisories** in build tooling (`undici`, `fast-uri`). Neither ships to the browser. I pinned installs to versions at least two weeks old, and `npm audit fix` would pull newer ones.
 
 ### The scene
@@ -198,7 +198,7 @@ Open:
 
 The program and the reels cover the resume. What's left is the room itself: things a curious visitor can find and play with, holding the personal stuff that isn't in the feature. None of it is needed to see the resume.
 
-### Status: ideas, not built yet
+### Status: lamps built, the rest are ideas
 
 Each object gets one job, so visitors know where to look and nothing ends up in two places:
 
@@ -217,7 +217,7 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 - These are the site's first real image files. Resize and compress them, and load them only when someone looks at the board, so the room still opens fast.
 - Strip the location data out of photos before publishing; phone photos often carry it.
 
-**Lamps.** Click a lamp to switch it off and on again. Off, its light and the dust in its glow go out and the room dims. The room has two: the table lamp and the pole lamp.
+**Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp.
 
 **Radio.** Live radio, tuned with a dial, with crackle between stations synthesized in code like the projector sounds.
 
@@ -249,8 +249,8 @@ Rules for all of them:
 
 Build order:
 
-1. A small setup so each clickable object in the room is one entry: where it is, how it highlights, what a click does.
-2. Lamps.
+1. A small setup so each clickable object in the room is one entry: where it is, how it highlights, what a click does. Built: the fixtures in `theater.ts`.
+2. Lamps. Built.
 3. Pin board.
 4. Radio.
 5. Magazines.
@@ -396,10 +396,7 @@ Decided for phase 2:
 - **Pixel art drawn in code** for now (tiles, character, items). It can be swapped for hand-drawn sprites later.
 - **Pixelify Sans** for the lobby's interface text.
 
-Still open:
-
-- Hosting: Cloudflare (my pick) or Vercel, for the live-data server endpoints later. GitHub Pages works for phase 1 alone.
-- A custom domain.
+Hosting: Cloudflare Workers, serving the build as static files (see the README's "Hosting"), at alexanderjhutchinson.com. The live-data server endpoints can run on the same Worker later.
 
 ## Ruled out
 
@@ -409,9 +406,9 @@ Still open:
 ## To do
 
 - [x] Merge into `main` (#1 for Phase 1, #2 for Phase 2).
-- [ ] Pick hosting and deploy.
+- [x] Pick hosting and deploy (#6 to #8).
 - [ ] Archive the old repo (`ahutchin/ahutchin.github.io`) instead of deleting it, or tag its last state (`v2-2024`) before wiping. Keeps the history.
-- [ ] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain.
+- [x] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain: it moved to alexanderjhutchinson.com.
 
 ---
 
