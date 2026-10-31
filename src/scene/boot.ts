@@ -226,6 +226,7 @@ export function boot() {
     else if (theater.mode === "idle") {
       if (theater.hitsProgram(x, y)) pickUp();
       else if (theater.hitsProjector(x, y)) void startFeature(REELS[0]);
+      else theater.clickFixture(x, y);
     } else if (theater.mode === "program") {
       const hit = theater.programHit(x, y);
       if (!hit) putDown();

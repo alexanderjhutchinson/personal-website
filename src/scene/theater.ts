@@ -31,7 +31,22 @@ import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures
  */
 export type Mode = "idle" | "program" | "playing" | "entering" | "reel" | "ending";
 
-export type HoverTarget = "projector" | "program" | null;
+export type HoverTarget = "projector" | "program" | "fixture" | null;
+
+/**
+ * Something in the room a click from the couch does something to, besides the program and the
+ * projector: the room extras in project.md. Nothing points at one; the cursor changes and it
+ * brightens a little under the pointer, and a tap works the same as a click.
+ */
+interface Fixture {
+  /** What a click has to land on. */
+  targets: THREE.Object3D[];
+  /** Show how far the pointer's highlight has eased in, 0 to 1. */
+  highlight(level: number): void;
+  click(): void;
+  /** The highlight's current level, eased every frame. */
+  hover: number;
+}
 
 /** What a click lands on while the program is held up. */
 export interface ProgramHit {
@@ -67,7 +82,11 @@ const TALL_VIEWS: ProgramView[] = [
 
 /** Everything the sequences animate. The render loop reads it every frame. */
 interface SceneState {
+  /** The house lights: the film dims them. */
   lamp: number;
+  /** Each lamp's own switch, 1 on and 0 off. The visitor flips these; the film leaves them be. */
+  tableLamp: number;
+  poleLamp: number;
   running: number;
   reels: number;
   beam: number;
@@ -103,6 +122,12 @@ const FILM_LOOK = { grain: 0.1, flicker: 0.1, weave: 1.4 };
 const REEL_LOOK = { grain: 0.05, flicker: 0.02, weave: 0 };
 /** The lamps while a reel plays: house lights at a low glow, so the room stays visible around the screen. */
 const REEL_LAMP = 0.28;
+
+/** How far the lamps' switches are on, 0 to 1. Most of the room's light is the table lamp's. */
+const switchedOn = (s: SceneState) => 0.8 * s.tableLamp + 0.2 * s.poleLamp;
+/** The room's fill light with its lamps switched off: moonlight, like a night scene on film. */
+const NIGHT_SKY = new THREE.Color(palette.moonLight).multiplyScalar(0.55);
+const NIGHT_GROUND = new THREE.Color("#0b0f1a");
 
 /**
  * Frames per second the room is drawn at: smooth while anything moves, half that while it sits
@@ -156,6 +181,8 @@ export class Theater {
 
   private state: SceneState = {
     lamp: 1,
+    tableLamp: 1,
+    poleLamp: 1,
     running: 0,
     reels: 0,
     beam: 0,
@@ -188,6 +215,13 @@ export class Theater {
   private time = 0;
   private hover = 0;
   private hovering: HoverTarget = null;
+  private fixtures: Fixture[] = [];
+  /** The fixture under the pointer, while hovering is "fixture". */
+  private fixture: Fixture | null = null;
+  /** Which way each lamp's switch was last flipped (its light may still be fading). */
+  private lampsOn = { tableLamp: true, poleLamp: true };
+  /** The fill light's own colors, with the lamps on. */
+  private warmFill!: { sky: THREE.Color; ground: THREE.Color };
   private pointer = new THREE.Vector2(0, 0);
   private parallax = new THREE.Vector2(0, 0);
   private size = { w: 1, h: 1 };
@@ -228,6 +262,12 @@ export class Theater {
     this.film = new Film();
     this.room = buildRoom(this.film.texture);
     scene.add(this.room.group);
+    const { lamp, accent, fill } = this.room;
+    this.warmFill = { sky: fill.color.clone(), ground: fill.groundColor.clone() };
+    this.fixtures = [
+      this.lampSwitch("tableLamp", lamp.hitTargets, (level) => (lamp.base.emissiveIntensity = level * 0.18)),
+      this.lampSwitch("poleLamp", accent.hitTargets, (level) => (accent.shades.emissiveIntensity = level * 0.25)),
+    ];
 
     this.projector = buildProjector(PROJECTOR.position, SCREEN.center);
     scene.add(this.projector.group);
@@ -326,6 +366,45 @@ export class Theater {
     // The held paper is always centered, so the halves of the screen are the halves of the paper.
     const rect = this.canvas.getBoundingClientRect();
     return { action: this.program.actionAt(hit), side: clientX < rect.left + rect.width / 2 ? -1 : 1 };
+  }
+
+  /** Click the fixture at this client position, if there is one. */
+  clickFixture(clientX: number, clientY: number) {
+    this.fixtureAt(clientX, clientY)?.click();
+  }
+
+  /** The nearest fixture under this client position. */
+  private fixtureAt(clientX: number, clientY: number) {
+    let nearest: Fixture | null = null;
+    let distance = Infinity;
+    for (const f of this.fixtures) {
+      const hit = this.raycast(clientX, clientY, f.targets)[0];
+      if (hit && hit.distance < distance) {
+        nearest = f;
+        distance = hit.distance;
+      }
+    }
+    return nearest;
+  }
+
+  /** A lamp that clicks off and on. Its light, and the room's, follow its switch. */
+  private lampSwitch(key: "tableLamp" | "poleLamp", targets: THREE.Object3D[], highlight: (level: number) => void): Fixture {
+    return {
+      targets,
+      highlight,
+      hover: 0,
+      click: () => {
+        const on = (this.lampsOn[key] = !this.lampsOn[key]);
+        this.sound.snap();
+        // A filament lights almost at once and takes a moment to go dark.
+        gsap.to(this.state, {
+          [key]: on ? 1 : 0,
+          duration: on ? 0.12 : 0.35,
+          ease: on ? "power2.out" : "power1.out",
+          overwrite: "auto",
+        });
+      },
+    };
   }
 
   /** Where the top of the program is on screen while it stands on the table, for the pick-up prompt. */
@@ -621,7 +700,8 @@ export class Theater {
     this.opts.onMode(mode);
   }
 
-  private setHovering(target: HoverTarget) {
+  private setHovering(target: HoverTarget, fixture: Fixture | null = null) {
+    this.fixture = fixture;
     if (target === this.hovering) return;
     this.hovering = target;
     this.canvas.style.cursor = target ? "pointer" : "";
@@ -636,7 +716,12 @@ export class Theater {
     if (this.mode === "idle") {
       const x = e.clientX;
       const y = e.clientY;
-      this.setHovering(this.hitsProgram(x, y) ? "program" : this.hitsProjector(x, y) ? "projector" : null);
+      if (this.hitsProgram(x, y)) this.setHovering("program");
+      else if (this.hitsProjector(x, y)) this.setHovering("projector");
+      else {
+        const fixture = this.fixtureAt(x, y);
+        this.setHovering(fixture ? "fixture" : null, fixture);
+      }
     } else if (this.mode === "program") {
       // The pointer shows over the paper (turn the page, follow a reel or link); off it, a click puts it down.
       this.canvas.style.cursor = this.hitsProgram(e.clientX, e.clientY) ? "pointer" : "";
@@ -792,17 +877,29 @@ export class Theater {
     this.hover += ((this.hovering === "projector" ? 1 : 0) - this.hover) * ease;
     this.paperHover += ((this.hovering === "program" ? 1 : 0) - this.paperHover) * ease;
 
-    // Lamp.
+    // Lamps: the house lights, times each lamp's own switch.
+    const table = s.lamp * s.tableLamp;
+    const pole = s.lamp * s.poleLamp;
     const lamp = this.room.lamp;
-    lamp.light.intensity = 12 * s.lamp;
-    lamp.shade.emissiveIntensity = 0.02 + 0.95 * s.lamp;
-    lamp.bulb.color.set(palette.lampLight).multiplyScalar(0.2 + 2.8 * s.lamp);
-    this.room.accent.light.intensity = 3 * s.lamp;
-    this.room.accent.glow.emissiveIntensity = 0.04 + 0.7 * s.lamp;
-    this.room.fill.intensity = 0.15 + 0.75 * s.lamp;
+    lamp.light.intensity = 12 * table;
+    lamp.shade.emissiveIntensity = 0.02 + 0.95 * table;
+    lamp.bulb.color.set(palette.lampLight).multiplyScalar(0.2 + 2.8 * table);
+    this.room.accent.light.intensity = 3 * pole;
+    this.room.accent.glow.emissiveIntensity = 0.04 + 0.7 * pole;
+    // The fill is mostly lamp light bouncing around. With the lamps switched off it turns to
+    // moonlight, so the room keeps its shapes; the film's dark (house lights down) stays dark.
+    const lit = switchedOn(s);
+    const fill = this.room.fill;
+    fill.color.copy(this.warmFill.sky).lerp(NIGHT_SKY, 1 - lit);
+    fill.groundColor.copy(this.warmFill.ground).lerp(NIGHT_GROUND, 1 - lit);
+    fill.intensity = 0.15 + s.lamp * (0.35 + 0.4 * lit);
+    for (const f of this.fixtures) {
+      f.hover += ((this.fixture === f ? 1 : 0) - f.hover) * ease;
+      f.highlight(f.hover);
+    }
     // Reduced motion freezes the drifting dust and smoke in place.
     const drift = this.opts.reducedMotion ? 0 : this.time;
-    this.roomDust.update(drift, s.lamp);
+    this.roomDust.update(drift, table);
 
     // Projector.
     this.projector.setRunning(s.running);
@@ -852,7 +949,9 @@ export class Theater {
     this.program.pose(s.open, s.flip, s.paper);
     // On the table it catches a little lamp light; held up, it's lit to read.
     const pulse = this.glint * (0.5 + 0.5 * Math.sin(this.time * 2.6)) * (1 - s.paper);
-    this.program.setGlow(lerp(0.03 + 0.07 * s.lamp + 0.12 * this.paperHover + 0.3 * pulse, 0.92, s.paper));
+    this.program.setGlow(
+      lerp(0.03 + 0.07 * s.lamp * switchedOn(s) + 0.12 * this.paperHover + 0.3 * pulse, 0.92, s.paper),
+    );
 
     tablePos.copy(PROGRAM.position);
     tablePos.y += PAPER.h / 2 + 0.012 * this.paperHover;

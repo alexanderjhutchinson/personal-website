@@ -13,9 +13,19 @@ export interface Room {
     bulb: THREE.MeshBasicMaterial;
     /** Lamp position in world space, used for the dust drifting around it. */
     position: THREE.Vector3;
+    /** What a click on the lamp lands on. */
+    hitTargets: THREE.Object3D[];
+    /** The ceramic base, which brightens under the pointer. */
+    base: THREE.MeshPhysicalMaterial;
   };
   /** The pole lamp in the far corner. Dims with the main lamp. */
-  accent: { light: THREE.PointLight; glow: THREE.MeshStandardMaterial };
+  accent: {
+    light: THREE.PointLight;
+    glow: THREE.MeshStandardMaterial;
+    hitTargets: THREE.Object3D[];
+    /** The outside of its two shades, which brightens under the pointer. */
+    shades: THREE.MeshStandardMaterial;
+  };
   fill: THREE.HemisphereLight;
   moon: THREE.DirectionalLight;
   windowGlass: THREE.MeshBasicMaterial;
@@ -332,10 +342,14 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
     [0.03, 0.34],
     [0, 0.34],
   ].map(([x, y]) => new THREE.Vector2(x, y));
-  const lampBase = new THREE.Mesh(
-    new THREE.LatheGeometry(lampProfile, 40),
-    new THREE.MeshPhysicalMaterial({ color: palette.burntOrange, roughness: 0.25, clearcoat: 0.8 }),
-  );
+  const baseMat = new THREE.MeshPhysicalMaterial({
+    color: palette.burntOrange,
+    emissive: new THREE.Color(palette.burntOrange),
+    emissiveIntensity: 0,
+    roughness: 0.25,
+    clearcoat: 0.8,
+  });
+  const lampBase = new THREE.Mesh(new THREE.LatheGeometry(lampProfile, 40), baseMat);
   lampBase.position.y = 0.6175;
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.16, 8), brass);
   neck.position.y = 0.6175 + 0.34 + 0.08;
@@ -375,7 +389,13 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
   const poleFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.04, 16), chromeMat);
   poleFoot.position.y = 0.02;
   pole.add(poleRod, poleFoot);
-  const coneOuter = new THREE.MeshStandardMaterial({ color: palette.harvestGold, metalness: 0.4, roughness: 0.45 });
+  const coneOuter = new THREE.MeshStandardMaterial({
+    color: palette.harvestGold,
+    emissive: new THREE.Color(palette.harvestGold),
+    emissiveIntensity: 0,
+    metalness: 0.4,
+    roughness: 0.45,
+  });
   const coneGlow = new THREE.MeshStandardMaterial({
     color: "#1a120b",
     emissive: new THREE.Color(palette.lampLight),
@@ -399,6 +419,11 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
   pole.position.set(ROOM.halfWidth - 0.32, 0, ROOM.back + 0.3);
   pole.rotation.y = -0.6;
   group.add(shadowed(pole, true, true));
+  // The rod is a few pixels wide from the couch, so clicks land on a thicker, unseen stand-in.
+  const poleHit = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, ROOM.height, 8), new THREE.MeshBasicMaterial());
+  poleHit.position.set(-0.06, ROOM.height / 2, 0);
+  poleHit.visible = false;
+  pole.add(poleHit);
   const accentLight = new THREE.PointLight(palette.lampLight, 3, 0, 2);
   accentLight.position.set(ROOM.halfWidth - 0.5, 1.75, ROOM.back + 0.45);
   group.add(accentLight);
@@ -517,8 +542,10 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
       shade,
       bulb,
       position: lampLight.position.clone(),
+      hitTargets: [lampBase, neck, shadeMesh, bulbMesh],
+      base: baseMat,
     },
-    accent: { light: accentLight, glow: coneGlow },
+    accent: { light: accentLight, glow: coneGlow, hitTargets: [pole], shades: coneOuter },
     fill,
     moon,
     windowGlass,

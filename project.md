@@ -8,10 +8,10 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 - **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. Merged into `main` (#2).
 - **The room, the program and the feature are tied together** (merged in #3): the resume is a folded program on the coffee table, and the opening runs straight into Reel 1.
 - **One room** (merged in #4, see "One room" below): the reels play on the room's screen instead of on pages of their own.
-- **Performance** on branch `performance` (see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
+- **Performance** (merged in #5, see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
-- **Nothing is deployed yet.**
-- **Next:** see "Phase 2: next up".
+- **Deployed** (#6 to #8): Cloudflare Workers serves the site at alexanderjhutchinson.com, and every push to `main` deploys it.
+- **Room extras** (see "Room extras" below): the lamps switch off and on. Next: the pin board, then a radio, magazines and film cans.
 
 ## Why it matters
 
@@ -72,7 +72,7 @@ Needs your review:
   - real phones, Safari and Firefox (only Chromium was tested)
   - the reduced-motion path, which I checked by reading the code but couldn't switch on in the test browser
 - [ ] **Page weight.** The 3D scene is about 300 KB gzipped. It loads after the page, so the program's text is never blocked, but the room takes a moment on slow connections.
-- [ ] **Not deployed.** Hosting needs your accounts.
+- [x] **Deployed** on Cloudflare Workers at alexanderjhutchinson.com (#6 to #8).
 - [ ] **`npm audit` flags two advisories** in build tooling (`undici`, `fast-uri`). Neither ships to the browser. I pinned installs to versions at least two weeks old, and `npm audit fix` would pull newer ones.
 
 ### The scene
@@ -180,7 +180,7 @@ The question: does the site make visitors' machines lag or run hot? Measured on 
 
 Where the time went, per frame: 4× anti-aliasing about 5 ms (every post-processing pass wrote to multisampled buffers, not just the scene), bloom about 2.8 ms, the film grain pass about 1.9 ms. The dust, the beam, the triangle count (about 13,000) and uploading the reel's picture each frame were all small.
 
-### Status: built (branch `performance`)
+### Status: built (merged in #5)
 
 - **Only the scene is anti-aliased.** It draws into a multisampled buffer of its own (`src/scene/scenePass.ts`), and bloom, color and film work on a plain copy. Same look; a frame went from 8.1 ms to 4.8 ms.
 - **The frame rate follows what's on screen:** 60 frames a second while anything moves (a sequence, the program being picked up or turned, the pointer moving, a reel playing), 30 while the room sits still on the couch or with the program held still. However fast the screen refreshes.
@@ -193,6 +193,70 @@ Open:
 
 - Not measured on an actual slow laptop or phone; the step-down was tested by slowing frames on purpose.
 - The reels' game still draws its picture on every screen refresh (about 1 ms of CPU each), though the room only shows it 60 times a second.
+
+## Room extras: the rest of the room
+
+The program and the reels cover the resume. What's left is the room itself: things a curious visitor can find and play with, holding the personal stuff that isn't in the feature. None of it is needed to see the resume.
+
+### Status: lamps built, the rest are ideas
+
+Each object gets one job, so visitors know where to look and nothing ends up in two places:
+
+| Object | Its job |
+|---|---|
+| The program | The resume (built) |
+| Pin board | Photos I love: stills to browse quickly |
+| Magazines | Hobbies and interests in depth: words and photos |
+| Film cans | Things better played in order: trips, things I'm building |
+| Radio | Sound |
+| Lamps | Light |
+| Decorations | Mine to design, after ideating |
+
+**Pin board.** On one of the walls, with photos I love (maybe other things later; to be decided). Click a photo and it comes off the board, enlarged with a caption, the way the item cards pop up.
+
+- These are the site's first real image files. Resize and compress them, and load them only when someone looks at the board, so the room still opens fast.
+- Strip the location data out of photos before publishing; phone photos often carry it.
+
+**Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp.
+
+**Radio.** Live radio, tuned with a dial, with crackle between stations synthesized in code like the projector sounds.
+
+- It plays each station's public stream. The stream has to be https, or the browser blocks it on an https site.
+- Stations go down or move their stream: fall back to static.
+- An old-radio tone filter only works when the station's server allows other sites to process its audio. Otherwise the station plays unfiltered.
+- The stream is the station's, not mine. Only use stations that publish their stream publicly, and check their terms.
+- Plan: 3 or 4 live stations I like, plus a station of my own playing royalty-free tracks, with the credits shown.
+- Turning the radio on turns the site's sound on.
+- Later: "now playing" from Spotify or Last.fm (see "Later: live data") could show on the dial.
+
+**Magazines.** A stack on the coffee table or the sideboard. Picking one up works like the program: hold it up, turn the pages, Escape puts it down. One issue per interest, each with an original 70s-style cover and title (no copies of real magazines).
+
+**Film cans.** Still being ideated: what plays on the screen. Clicking a can loads it into the projector and plays it on the screen; it runs out and the camera pulls back, like the feature's ending. Options:
+
+1. **Home movies:** my own photos played as 8mm footage, with slow pans, a title card, and the existing grain and flicker. One can per trip or event. Needs only photos.
+2. **Coming attractions:** trailers for things I'm building or want to build. A few title cards, a tagline, "coming soon".
+3. **Newsreel:** "This week with Alex", built from live data: what I'm listening to, GitHub activity, what I'm playing. Ties into "Later: live data".
+4. **Favorite films:** a title card per film with my rating and a short review. No real footage, since that's copyrighted.
+
+Leaning toward 1 and 2 first: least new art, and the best fit for movie night. The cans already on the coffee table are labeled Experience, Projects and Photos, from before the reels, so they need new labels.
+
+Rules for all of them:
+
+- No markers or prompts. The cursor changes and a faint glint shows on hover. The program's pick-up prompt stays the only one.
+- Everything works with a tap; touch screens have no hover.
+- Nothing adds work while the room sits idle (see "Performance").
+- Escape puts back whatever is open, like the program.
+
+Build order:
+
+1. A small setup so each clickable object in the room is one entry: where it is, how it highlights, what a click does. Built: the fixtures in `theater.ts`.
+2. Lamps. Built.
+3. Pin board.
+4. Radio.
+5. Magazines.
+6. Film cans, once their content is picked.
+
+Needed from me: the decorations (each object, where it sits, and what it does when clicked, if anything), photos for the board, the radio stations, magazine topics, and what goes on the film cans.
 
 ## Phase 2: the world and how info is communicated
 
@@ -208,7 +272,7 @@ Open:
 - **Projects go in the feature,** as Reel 3, not on a film can.
 - **Content source for now:** the June 2026 resume (appendix), without bullets.
 - **How Phase 1 leads into Phase 2:** the opening ends on Reel 1 instead of the resume (done). The film cans on the coffee table become clickable and play their home movie. The resume becomes the program, a paper on the coffee table (done, see "The program").
-- **Still open:** what item name color means (type, recency, or impact; the reels use type for now: school, work, project), and what the Hobbies and Photos home movies show.
+- **Still open:** what item name color means (type, recency, or impact; the reels use type for now: school, work, project), and what the Hobbies and Photos home movies show (now being worked out in "Room extras").
 
 ### Status: three reels built (merged in #2)
 
@@ -253,7 +317,7 @@ In rough order:
 
 1. **Phone controls:** tap a spot to walk there and tap a door to change reels. The door buttons already work by touch.
 2. **Write-ups on the cards:** a line in your own voice per item, links (GitHub, demos), and later screenshots.
-3. **Clickable film cans:** home movies for Photos (a slide projector) and Hobbies.
+3. **Clickable film cans:** moved to "Room extras", with the rest of the room's clickable things.
 4. **Tune the feel** in the tuning panel, then copy the values into `DEFAULT_TUNING`.
 5. **Scene polish:** more props, and a reason to use the tools on each reel (ore in the mine, crafting at the workbench).
 6. **Later:** the live data (time of day, weather, the radio) and extra lobby fun (critters, a boss).
@@ -307,7 +371,7 @@ Each of these has a natural home in the scene. They need a small server piece to
 
 - **Time of day:** computed in the browser from Waterloo time, no API needed. Drives lighting (window light, lamps on at night). Shows my time, not the visitor's.
 - **Weather:** Open-Meteo (free, no key). Rain or snow on the window, storm flashes.
-- **Radio / now playing:** Spotify or Last.fm. Can show the song and link to it, but can't play my music to visitors. Any site music has to be original or licensed.
+- **Radio / now playing:** Spotify or Last.fm. Can show the song and link to it, but can't play my music to visitors. Any site music has to be original or licensed. The radio itself (live stations and a royalty-free station of my own) is planned in "Room extras".
 - **Ticker or marquee:** one strip showing all of it, for example "Now playing: … · −4°C, light snow in Waterloo · 11:42 pm".
 - **Others:** GitHub activity, osu! stats, current Steam game.
 - **Location:** city-level and set by me, never GPS. Switch it during a co-op term elsewhere.
@@ -332,10 +396,7 @@ Decided for phase 2:
 - **Pixel art drawn in code** for now (tiles, character, items). It can be swapped for hand-drawn sprites later.
 - **Pixelify Sans** for the lobby's interface text.
 
-Still open:
-
-- Hosting: Cloudflare (my pick) or Vercel, for the live-data server endpoints later. GitHub Pages works for phase 1 alone.
-- A custom domain.
+Hosting: Cloudflare Workers, serving the build as static files (see the README's "Hosting"), at alexanderjhutchinson.com. The live-data server endpoints can run on the same Worker later.
 
 ## Ruled out
 
@@ -345,9 +406,9 @@ Still open:
 ## To do
 
 - [x] Merge into `main` (#1 for Phase 1, #2 for Phase 2).
-- [ ] Pick hosting and deploy.
+- [x] Pick hosting and deploy (#6 to #8).
 - [ ] Archive the old repo (`ahutchin/ahutchin.github.io`) instead of deleting it, or tag its last state (`v2-2024`) before wiping. Keeps the history.
-- [ ] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain.
+- [x] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain: it moved to alexanderjhutchinson.com.
 
 ---
 

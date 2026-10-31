@@ -91,6 +91,15 @@ export class ProjectorSound {
     this.tick(t, 0.6, 2500);
   }
 
+  /** A lamp's switch: a small, bright double click. */
+  snap() {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.tick(t, 0.5, 2800);
+    this.tick(t + 0.035, 0.22, 4200);
+  }
+
   /** Motor and clatter speed up to running speed over `seconds`. */
   startMotor(seconds: number) {
     const ctx = this.ensure();
