@@ -133,7 +133,7 @@ The site had three parts that didn't feel like one thing: the room, the resume, 
 
 - **A folded program stands on the coffee table,** half open like a greeting card, between the film cans and the projector. Same design as before (cream paper, title-card type, diamond ornaments), painted in code.
 - **A game-style prompt points at it:** "[E] Pick up the program" (or "Tap to pick up the program") just above it, and the paper shimmers, until it's been picked up once. After that the prompt shows on hover only.
-- **Picking it up** (click, tap, or E) lifts it off the table and holds it up to the camera while the room dims. It's readable right in the render, like a note in a horror game.
+- **Picking it up** (click, tap, E, or the "Read the program" link, which shows top left only once it's tabbed to, for keyboards and screen readers) lifts it off the table and holds it up to the camera while the room dims. It's readable right in the render, like a note in a horror game.
 - **Four pages to turn through** with the arrow keys, the on-screen buttons, or a click on either half: the cover (name and tonight's running order of reels), the inside spread (Experience and Education; Projects and Skills), and the back (Contact).
 - **No separate reading view.** A high-def HTML view (R) was tried and dropped: the paper in hand is the way to read it. The contact links printed on the back work when clicked.
 - **Phones:** a tall screen is too narrow for the inside spread, so the inside comes one page at a time (cover, inside left, inside right, back), each filling the width. The paper draws back a little while it opens or turns over, so the cover never swings into the camera.
