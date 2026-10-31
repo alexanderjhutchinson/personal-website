@@ -11,7 +11,7 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 - **Performance** (merged in #5, see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Deployed** (#6 to #8): Cloudflare Workers serves the site at alexanderjhutchinson.com, and every push to `main` deploys it.
-- **Room extras** (see "Room extras" below): the lamps switch off and on, and the radio plays one station. Next: the pin board, then magazines and film cans.
+- **Room extras** (see "Room extras" below): the lamps switch off and on, the radio plays one station, and the camera goes over to the pin board, where the photos come off to look at. Next: magazines and film cans.
 
 ## Why it matters
 
@@ -198,7 +198,7 @@ Open:
 
 The program and the reels cover the resume. What's left is the room itself: things a curious visitor can find and play with, holding the personal stuff that isn't in the feature. None of it is needed to see the resume.
 
-### Status: lamps and radio built, the rest are ideas
+### Status: lamps, radio and pin board built, the rest are ideas
 
 Each object gets one job, so visitors know where to look and nothing ends up in two places:
 
@@ -212,10 +212,13 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 | Lamps | Light |
 | Decorations | Mine to design, after ideating |
 
-**Pin board.** On one of the walls, with photos I love (maybe other things later; to be decided). Click a photo and it comes off the board, enlarged with a caption, the way the item cards pop up.
+**Pin board (built).** On the back wall, right of the screen and above the radio, where the pole lamp lights it: cork in a walnut frame, with snapshots on colored pushpins and a ticket stub from the Late Show. From the couch the whole board is one thing: it brightens under the pointer, and a click turns the camera to face it, filling most of the view. There each photo brightens under the pointer, and a click takes it off its pin (the pin stays in the cork) and up to the camera, the way the program is picked up, with "3 / 7" in a bar below. No captions: the photos speak for themselves. The arrows, the bar's buttons, or a click on either half of the photo go to the next or previous one, round and round: the one in hand goes back as the next comes off. Escape, a click off the photo, or "Pin it back" puts it back, and the camera stays at the board. Escape again, a click off the board, or "Back to the couch" goes back to the couch. A soft pushpin click goes with each photo. Bloom drops most of the way at the board, since the pole lamp is close enough to make the prints glow.
 
-- These are the site's first real image files. Resize and compress them, and load them only when someone looks at the board, so the room still opens fast.
-- Strip the location data out of photos before publishing; phone photos often carry it.
+- Seven of my photos: a rest in the mountains (on film), dumplings round a big table, graduation, friends out front in the holiday lights, a night out (on an old digital camera), a shrine by a pond, and a road mirror on a mountain road. Painted into white-bordered prints, faded like 1970s drugstore prints. The night shot sits top right, in the pole lamp's bright spot.
+- They're the site's first image files. The originals live in `Photos/`, which git ignores; their metadata (GPS, camera, dates, iPhone HDR extras, Photos-library attributes) was stripped there too. `npm run photos` (scripts/photos.mjs, with sharp) makes a small WebP of each (512 px long side, about 300 KB for all seven) loaded with the room, and a large one (1600 px, 90 to 650 KB) loaded only when it's held up, so the room still opens fast. The copies are upright sRGB with no metadata at all.
+- Each print is painted small for the board, and sharp from the large copy only while it's held up (the small one shows, scaled up, until it's in); the sharp print is freed once it's back on the board. Until its small copy loads, a print's picture is dark.
+- For the keyboard, a "Look at the photos on the pin board" button shows only once it's tabbed to, so the room keeps its no-markers rule. It goes over to the board and holds up the first photo. At the board, Enter or the right arrow holds up the first photo, and the left arrow the last.
+- To add or swap a photo: put the original in `Photos/`, run `npm run photos`, and add it to the list in `src/scene/board.ts` with its shape and a spot on the board. Strip its metadata first anyway; phone photos carry their location.
 
 **Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp.
 
@@ -251,7 +254,7 @@ Build order:
 
 1. A small setup so each clickable object in the room is one entry: where it is, how it highlights, what a click does. Built: the fixtures in `theater.ts`.
 2. Lamps. Built.
-3. Pin board.
+3. Pin board. Built, with my photos.
 4. Radio. Built.
 5. Magazines.
 6. Film cans, once their content is picked.
@@ -387,7 +390,7 @@ Decided for phase 1:
 - **GSAP** timelines for the opening, skip, and ending sequences.
 - **Web Audio** for sound, synthesized in code. The one audio file is the radio's record, a public-domain 78.
 - **Self-hosted fonts** via Fontsource: Fraunces (display), Instrument Sans (body), IBM Plex Mono (labels).
-- **No image files.** Every texture is painted on a canvas at load time.
+- **Almost no image files.** Every texture is painted on a canvas at load time, except the pin board's photos (small and large WebP copies, drawn into painted prints).
 
 Decided for phase 2:
 

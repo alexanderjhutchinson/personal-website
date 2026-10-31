@@ -32,4 +32,7 @@ export const PROGRAM = { position: new Vector3(0.14, COFFEE_TABLE.top, 0.33), ya
 
 export const LAMP = { table: new Vector3(-2.45, 0, -3.25) };
 
+/** The pin board on the back wall, right of the screen and above the radio, where the pole lamp lights it. */
+export const BOARD = { center: new Vector3(1.98, 1.6, ROOM.back), width: 1.1, height: 0.75 };
+
 export const WINDOW = { z0: -3.55, z1: -2.35, y0: 0.85, y1: 2.05 };

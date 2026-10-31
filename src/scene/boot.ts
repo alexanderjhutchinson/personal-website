@@ -5,7 +5,8 @@ import type { RegionAction } from "./programPages";
 import type { Mode, Theater } from "./theater";
 
 // Connects the 3D room to the page: buttons, keyboard, sound preference,
-// first-visit tracking, the program (picked up and turned), and the reels,
+// first-visit tracking, the program (picked up and turned), the pin board
+// (gone over to, its photos taken off and looked through), and the reels,
 // which play on the room's screen. The whole site is this one page; each
 // address opens it in a different state.
 
@@ -30,11 +31,13 @@ function write(key: string, value: string) {
 }
 
 /** "flat" is the page without the 3D room: the program on its own, or a reel on its own. */
-type PageMode = "room" | "program" | "playing" | "entering" | "reel" | "ending" | "flat";
+type PageMode = "room" | "program" | "board" | "photo" | "playing" | "entering" | "reel" | "ending" | "flat";
 
 const pageMode: Record<Mode, PageMode> = {
   idle: "room",
   program: "program",
+  board: "board",
+  photo: "photo",
   playing: "playing",
   entering: "entering",
   reel: "reel",
@@ -54,6 +57,8 @@ export function boot() {
   const pickup = $("pickup");
   const viewName = document.querySelector("[data-view-name]");
   const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
+  const photoCount = document.querySelector("[data-photo-count]");
+  const lookButton = $<HTMLButtonElement>("look-photos");
   if (!stage || !canvas) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -124,6 +129,9 @@ export function boot() {
             lobby?.setSound(true);
           },
           onProgramPage: (name, first, last) => renderView(name, first, last),
+          onPhoto: (index, count) => {
+            if (photoCount) photoCount.textContent = `${index + 1} / ${count}`;
+          },
           onFrame: () => placePrompt(),
         });
         await t.init();
@@ -179,6 +187,7 @@ export function boot() {
       return;
     }
     await theater.putDown();
+    await theater.toCouch();
     lobby.open(reel.id);
     theater.start();
   };
@@ -240,6 +249,12 @@ export function boot() {
       if (!hit) putDown();
       else if (hit.action) follow(hit.action);
       else theater.turn(hit.side);
+    } else if (theater.mode === "board") {
+      theater.clickBoard(x, y);
+    } else if (theater.mode === "photo") {
+      const side = theater.photoHit(x, y);
+      if (side === null) void theater.pinBack();
+      else theater.browse(side);
     }
   });
 
@@ -278,9 +293,20 @@ export function boot() {
   });
 
   readLink?.addEventListener("click", (e) => {
-    if (!theater || (theater.mode !== "idle" && theater.mode !== "program")) return;
+    const t = theater;
+    if (!t || (t.mode !== "idle" && t.mode !== "program" && t.mode !== "board" && t.mode !== "photo")) return;
     e.preventDefault();
-    pickUp();
+    void t.toCouch().then(pickUp);
+  });
+
+  // The pin board's photos, for the keyboard: the button only shows once it has focus. It goes over to
+  // the board and takes the first photo off, ready for the arrows.
+  lookButton?.addEventListener("click", async () => {
+    const t = theater;
+    if (t?.mode !== "idle") return;
+    await t.lookAtBoard();
+    t.holdPhoto();
+    document.querySelector<HTMLButtonElement>('[data-browse="1"]')?.focus();
   });
 
   endButton?.addEventListener("click", (e) => {
@@ -310,12 +336,18 @@ export function boot() {
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-browse]")
+    .forEach((b) => b.addEventListener("click", () => theater?.browse(Number(b.dataset.browse) < 0 ? -1 : 1)));
+  document.querySelectorAll("[data-pin-back]").forEach((b) => b.addEventListener("click", () => void theater?.pinBack()));
+  document.querySelectorAll("[data-leave-board]").forEach((b) => b.addEventListener("click", () => void theater?.leaveBoard()));
 
   // Keyboard. While a reel plays, the keys are the game's.
   /**
    * Escape always backs out of whatever is on top, one layer at a time: an item card (which closes
    * itself), the plain program, the tuning panel, then the film (back to the couch), the opening
-   * (stopped), or the program in hand (put down).
+   * (stopped), the program in hand (put down), the photo in hand (pinned back), or the pin board (back
+   * to the couch).
    */
   const escape = () => {
     if (document.querySelector("dialog[open]")) return;
@@ -328,6 +360,8 @@ export function boot() {
     } else if (theater.mode === "reel" || theater.mode === "entering") endFeature();
     else if (theater.mode === "playing") theater.abort();
     else if (theater.mode === "program") putDown();
+    else if (theater.mode === "photo") void theater.pinBack();
+    else if (theater.mode === "board") void theater.leaveBoard();
   };
 
   document.addEventListener("keydown", (e) => {
@@ -359,6 +393,19 @@ export function boot() {
         else return;
         e.preventDefault();
         break;
+      case "board":
+        // The arrows, or Enter, take a photo off the board: the first, or going left, the last.
+        if (key === "arrowright" || key === "d" || (!onControl && (key === "enter" || key === " "))) theater.holdPhoto();
+        else if (key === "arrowleft" || key === "a") theater.holdPhoto(-1);
+        else return;
+        e.preventDefault();
+        break;
+      case "photo":
+        if (key === "arrowleft" || key === "a") theater.browse(-1);
+        else if (key === "arrowright" || key === "d") theater.browse(1);
+        else return;
+        e.preventDefault();
+        break;
     }
   });
 
@@ -366,7 +413,8 @@ export function boot() {
   window.addEventListener("popstate", () => {
     if (!theater) return;
     const reel = reelAt(location.pathname);
-    if (reel && (theater.mode === "idle" || theater.mode === "program")) void startFeature(reel, false);
+    const onCouch = ["idle", "program", "board", "photo"].includes(theater.mode);
+    if (reel && onCouch) void startFeature(reel, false);
     else if (!reel && theater.mode === "reel") endFeature(false);
   });
 

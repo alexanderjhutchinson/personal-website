@@ -10,13 +10,14 @@ const { open } = Astro.props;
   <canvas
     id="scene"
     role="img"
-    aria-label="A 1970s living room at night. A home movie projector sits on the coffee table, pointed at a pull-down screen, with a folded program standing beside it."
+    aria-label="A 1970s living room at night. A home movie projector sits on the coffee table, pointed at a pull-down screen, with a folded program standing beside it. Photos are pinned to a cork board beside the screen."
   ></canvas>
 
   <p class="loading" aria-live="polite">Threading the film…</p>
 
   <div class="top-bar">
     <a id="read-program" class="skip" href="/program">Read the program</a>
+    <button id="look-photos" class="skip look" type="button">Look at the photos on the pin board</button>
     <button id="sound-toggle" class="reel-button sound" type="button" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
@@ -40,6 +41,19 @@ const { open } = Astro.props;
     <span class="view-name" data-view-name aria-live="polite">Cover</span>
     <button class="reel-button" type="button" data-turn="1" aria-label="Next page"><span aria-hidden="true">▶</span></button>
     <button class="reel-button" type="button" data-put-down>Put it down <kbd>Esc</kbd></button>
+  </div>
+
+  <!-- At the pin board. -->
+  <div class="board-bar" role="group" aria-label="The pin board">
+    <button class="reel-button" type="button" data-leave-board>Back to the couch <kbd>Esc</kbd></button>
+  </div>
+
+  <!-- While a photo from the pin board is held up. -->
+  <div class="photo-bar" role="group" aria-label="Photos from the pin board">
+    <button class="reel-button" type="button" data-browse="-1" aria-label="Previous photo"><span aria-hidden="true">◀</span></button>
+    <p class="count" aria-live="polite"><span class="visually-hidden">Photo </span><span data-photo-count></span></p>
+    <button class="reel-button" type="button" data-browse="1" aria-label="Next photo"><span aria-hidden="true">▶</span></button>
+    <button class="reel-button" type="button" data-pin-back>Pin it back <kbd>Esc</kbd></button>
   </div>
 
   <p class="skip-hint">
@@ -111,6 +125,26 @@ const { open } = Astro.props;
     color: var(--ink-dim);
   }
 
+  /* For the keyboard only: hidden until it has focus, so the room keeps its no-markers rule. */
+  .look {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .look:not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
   .sound .waves {
     display: none;
   }
@@ -174,7 +208,9 @@ const { open } = Astro.props;
 
   :global(html[data-mode="playing"]) .top-bar .skip,
   :global(html[data-mode="ending"]) .top-bar .skip,
-  :global(html[data-mode="program"]) .top-bar .skip {
+  :global(html[data-mode="program"]) .top-bar .skip,
+  :global(html[data-mode="board"]) .top-bar .skip,
+  :global(html[data-mode="photo"]) .top-bar .skip {
     opacity: 0;
     pointer-events: none;
   }
@@ -243,7 +279,9 @@ const { open } = Astro.props;
     }
   }
 
-  .paper-bar {
+  .paper-bar,
+  .board-bar,
+  .photo-bar {
     position: absolute;
     left: 50%;
     bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px));
@@ -260,13 +298,17 @@ const { open } = Astro.props;
     transition: opacity 0.3s;
   }
 
-  :global(html[data-mode="program"]) .paper-bar {
+  :global(html[data-mode="program"]) .paper-bar,
+  :global(html[data-mode="board"]) .board-bar,
+  :global(html[data-mode="photo"]) .photo-bar {
     opacity: 1;
     pointer-events: auto;
     transition-delay: 0.35s;
   }
 
-  .paper-bar .reel-button {
+  .paper-bar .reel-button,
+  .board-bar .reel-button,
+  .photo-bar .reel-button {
     padding: 0.5em 0.8em;
     font-size: 0.7rem;
     background: rgba(15, 11, 8, 0.82);
@@ -275,6 +317,18 @@ const { open } = Astro.props;
   .paper-bar .reel-button:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+
+  .photo-bar .count {
+    margin: 0;
+    padding: 0.3em 0.7em;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    white-space: nowrap;
+    background: rgba(15, 11, 8, 0.6);
+    border-radius: 2px;
   }
 
   .view-name {

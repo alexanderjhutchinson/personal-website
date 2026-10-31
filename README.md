@@ -21,6 +21,8 @@ Then open http://localhost:4321.
 
 `npm run build` type-checks and builds the static site into `dist/`. `npm run preview` serves that build.
 
+`npm run photos` remakes the pin board's photos from the originals in `Photos/`, which git ignores: a small and a large WebP of each in `public/photos/`, upright and with no metadata (no location, camera or dates). Add a new one to the list in `src/scene/board.ts`.
+
 ## Hosting
 
 Cloudflare Workers serves `dist/` as static files; there's no server code. [wrangler.jsonc](wrangler.jsonc) is the whole setup. Its `name` has to match the project's name in the Cloudflare dashboard. Every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`), and other branches get preview builds.
@@ -41,21 +43,22 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/data/program.ts` | What's printed in the program, page by page. The 3D paper and the plain HTML version both use it. |
 | `src/pages/index.astro`, `program.astro`, `[reel].astro` | Every address is the same room, opened in a different state: on the couch, with the program in hand, or with a reel playing on the screen. |
 | `src/components/Room.astro` | The one page: the stage, the reels, and the program for when the room can't run. |
-| `src/components/Stage.astro` | Canvas and everything over the room: sound, the pick-up prompt, the controls while holding the program. |
+| `src/components/Stage.astro` | Canvas and everything over the room: sound, the pick-up prompt, the controls while holding the program or a photo. |
 | `src/components/Reel.astro` | What sits around the reel: the door buttons, sound and × in the margins, the item cards, and the reel's items as a list for screen readers. Without the room, the reel's picture shows here on its own. |
 | `src/components/ProgramView.astro` | The program as a plain page: without the room, and from the "too narrow" note. |
 | `src/components/Program.astro` | The program in HTML, printed on cream paper. |
 | `src/layouts/Base.astro`, `public/og-image.jpg` | Every page's head, including the link preview: title, description, and the image of the room (1200×627) that LinkedIn, iMessage and Slack show when the site is shared. |
-| `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps and the radio). |
+| `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps, the radio and the pin board), the walk over to the pin board, and holding up the program or a photo. |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, radio, window, screen. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
 | `src/scene/program.ts` | The program on the coffee table: a folded sheet that opens and turns over. |
+| `src/scene/board.ts`, `public/photos/`, `scripts/photos.mjs` | The pin board beside the screen: cork in a walnut frame, photos on pushpins, and a ticket stub. Each photo has a small copy, loaded with the room, and a large one, loaded when it's held up. The script makes them from the originals. |
 | `src/scene/programPages.ts` | Paints the program's four pages, and where the reels and links on them are. |
 | `src/scene/beam.ts` | The projector beam and the dust in it and around the lamp. |
 | `src/scene/film.ts` | What's on the screen: leader, countdown, a still of a reel, the film running out, film damage. |
 | `src/scene/filmPass.ts` | Full-frame film look: grain, gate weave, flicker, vignette. |
 | `src/scene/scenePass.ts` | Draws the room anti-aliased into a buffer of its own, so the effects after it work on a plain copy. |
-| `src/scene/sound.ts` | The room's sounds (projector, paper, lamp switches, the radio's knob), synthesized with Web Audio. |
+| `src/scene/sound.ts` | The room's sounds (projector, paper, lamp switches, the radio's knob, pushpins), synthesized with Web Audio. |
 | `src/scene/radio.ts`, `public/radio/tiger-rag.mp3` | The radio's one station: a public-domain 78 played through a small-speaker filter, with a burst of static as it warms up. The site's only audio file, loaded the first time the radio is switched on. |
 | `src/scene/textures.ts` | Every surface texture, painted on canvases at load time. |
 | `src/scene/layout.ts` | Room dimensions and where everything sits. |
@@ -78,8 +81,9 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **The lamps:** click the table lamp or the pole lamp to switch it off and on. Nothing points them out: the cursor changes and the lamp brightens a little under the pointer. With both off, the room is lit by the moon through the window. The film dims the lamps as before but leaves their switches alone, so a lamp switched off stays off after the film.
 - **The radio:** click the radio on the sideboard to switch it on and off. One station, playing "Tiger Rag" by the Original Dixieland Jass Band (1918), a public-domain recording from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tiger_Rag_ODJB.ogg). Switching it on turns the site's sound on; turning sound off switches it off. The film turns it down, and it comes back up after.
+- **The pin board:** beside the screen, above the radio. Click it and the camera goes over to it. There, click a photo and it comes off its pin and up to the camera, with "3 / 7" below. The arrows (or a click on either half of the photo) go through the board; Escape, a click off the photo, or "Pin it back" puts it back on the board. Escape again, a click off the board, or "Back to the couch" goes back. For the keyboard, a "Look at the photos" button shows when tabbed to.
 - **Sound:** off until turned on. The choice is remembered.
-- **Escape** always backs out of whatever is on top, one layer at a time: an item card, then the plain program, then the film (back to the couch, like the ×). During the opening it stops the film; with the program in hand it puts it down.
+- **Escape** always backs out of whatever is on top, one layer at a time: an item card, then the plain program, then the film (back to the couch, like the ×). During the opening it stops the film; with the program in hand it puts it down; with a photo in hand it pins it back, and at the pin board it goes back to the couch.
 - **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.
 - **Wide screens only:** windows narrower than 6:5 (an upright phone, a narrow window) get a note to turn the phone sideways or widen the window, with "Read the program instead" for the plain program.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
