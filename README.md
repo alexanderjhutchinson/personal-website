@@ -25,6 +25,8 @@ Then open http://localhost:4321.
 
 Cloudflare Workers serves `dist/` as static files; there's no server code. [wrangler.jsonc](wrangler.jsonc) is the whole setup. Its `name` has to match the project's name in the Cloudflare dashboard. Every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`), and other branches get preview builds.
 
+The site lives at [alexanderjhutchinson.com](https://alexanderjhutchinson.com), with `www.` serving it too. Both domains are listed in `wrangler.jsonc`, and every deploy makes the dashboard match that list, so add or remove domains there rather than in the dashboard. The same goes for the `workers.dev` address and the preview links, which the config keeps on.
+
 Addresses have no trailing slash: `/about/` redirects to `/about`, which matches the addresses the room writes into the browser history.
 
 To try the hosted setup locally, build first, then run `npx wrangler dev`.
