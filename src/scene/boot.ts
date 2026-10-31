@@ -87,19 +87,18 @@ export function boot() {
   };
   renderSound();
 
-  // The reels: the game, laid exactly over the picture on the room's screen.
+  // The reels: the game draws one picture, which plays on the room's screen in 3D (or on its own, without the room).
   const lobby = startLobby({ onSound: setSound });
-  const placeReel = () => {
-    if (!lobby) return;
-    if (root.dataset.mode === "flat") {
-      lobby.place(null);
-      return;
-    }
+  const reelScreen = $("reel-screen");
+  // The room's controls sit in the margins around the screen's picture: tell them where it is.
+  const placeControls = () => {
     const view = canvas.getBoundingClientRect();
     const rect = reelRect(view.width, view.height);
-    lobby.place({ x: view.left + rect.x, y: view.top + rect.y, w: rect.w, h: rect.h });
+    root.style.setProperty("--reel-x", `${Math.round(rect.x)}px`);
+    root.style.setProperty("--below-reel", `${Math.round(view.height - rect.y - rect.h)}px`);
   };
-  window.addEventListener("resize", placeReel);
+  placeControls();
+  window.addEventListener("resize", placeControls);
 
   soundButton?.addEventListener("click", () => {
     setSound(!soundOn);
@@ -110,7 +109,7 @@ export function boot() {
     console.warn("The 3D room couldn't start, showing the page without it.", err);
     setPageMode("flat");
     root.dataset.scene = "unavailable";
-    placeReel();
+    if (openedOn && reelScreen) lobby?.mount(reelScreen);
   };
 
   const load = () => {
@@ -132,6 +131,7 @@ export function boot() {
         await t.init();
         if (import.meta.env.DEV) (window as unknown as { theater: Theater }).theater = t;
         t.sound.setEnabled(soundOn);
+        if (lobby) t.setPicture(lobby.picture);
         theater = t;
         delete root.dataset.loading;
         if (openedOn) t.enterReel(openedOn.id);
@@ -156,7 +156,6 @@ export function boot() {
       // The camera has reached the screen: the reel fades in over it.
       write(SEEN_KEY, "1");
       if (pushFeature && location.pathname !== feature.path) history.pushState(null, "", feature.path);
-      placeReel();
       lobby?.setActive(true);
     }
     if (mode === "reel" && lobby) theater?.showReel(lobby.reel);
@@ -191,7 +190,8 @@ export function boot() {
     lobby.setActive(false);
     if (push) history.pushState(null, "", "/");
     document.title = person.name;
-    theater.end(lobby.reel);
+    canvas.style.cursor = "";
+    theater.end();
   };
 
   const follow = (action: RegionAction) => {
@@ -243,6 +243,40 @@ export function boot() {
     }
   });
 
+  // While a reel plays, the pointer goes through the room's screen into the game.
+  const onScreen = (e: MouseEvent) => (theater?.mode === "reel" ? theater.pictureAt(e.clientX, e.clientY) : null);
+  canvas.addEventListener("pointermove", (e) => {
+    if (theater?.mode !== "reel" || !lobby) return;
+    const at = onScreen(e);
+    if (at) lobby.pointer("move", at.x, at.y);
+    else lobby.pointer("leave");
+    canvas.style.cursor = at ? lobby.cursorAt(at.x, at.y) : "";
+  });
+  canvas.addEventListener("pointerdown", (e) => {
+    const at = onScreen(e);
+    if (!at || !lobby) return;
+    canvas.setPointerCapture(e.pointerId);
+    lobby.pointer("down", at.x, at.y);
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    if (theater?.mode !== "reel" || !lobby) return;
+    const at = onScreen(e);
+    lobby.pointer("up", at?.x, at?.y);
+  });
+  canvas.addEventListener("pointerleave", () => lobby?.pointer("leave"));
+  canvas.addEventListener(
+    "wheel",
+    (e) => {
+      if (!onScreen(e)) return;
+      e.preventDefault();
+      lobby?.wheel(e.deltaY);
+    },
+    { passive: false },
+  );
+  canvas.addEventListener("contextmenu", (e) => {
+    if (theater?.mode === "reel") e.preventDefault();
+  });
+
   readLink?.addEventListener("click", (e) => {
     if (!theater || (theater.mode !== "idle" && theater.mode !== "program")) return;
     e.preventDefault();
@@ -254,6 +288,15 @@ export function boot() {
     e.preventDefault();
     endFeature();
   });
+
+  // On a screen too narrow for the room, the program as a plain page.
+  document.querySelectorAll("[data-plain]").forEach((b) =>
+    b.addEventListener("click", () => {
+      root.dataset.plain = "";
+      $("program-view")?.scrollTo(0, 0);
+    }),
+  );
+  document.querySelectorAll("[data-plain-close]").forEach((b) => b.addEventListener("click", () => delete root.dataset.plain));
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
@@ -295,11 +338,11 @@ export function boot() {
     else if (!reel && theater.mode === "reel") endFeature(false);
   });
 
-  // Opened on a reel: it's up straight away, on the screen, and the room fades in around it.
+  // Opened on a reel: it starts straight away, and shows on the screen as soon as the room is up.
   if (openedOn && lobby) {
     lobby.open(openedOn.id);
     if (root.dataset.mode === "room") setPageMode("reel");
-    placeReel();
+    else if (reelScreen) lobby.mount(reelScreen);
     lobby.setActive(true);
   }
 

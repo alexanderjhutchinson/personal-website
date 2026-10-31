@@ -2,9 +2,11 @@
 import "@fontsource/pixelify-sans/500.css";
 import { ITEM_TYPES, REELS, reelItems, type ReelId } from "../data";
 
-// The feature's reels: the game, its item panel and cards, and the × that ends
-// the film. With the 3D room running, the page lays this over the room's screen;
-// without it, a reel's address shows it on its own.
+// The reels around the room's screen. The game itself, with its hotbar and item
+// panel, is drawn into a picture that plays on the screen in 3D; this is what
+// sits around it: the room-style controls in the margins (doors, sound, the ×),
+// the item cards, and the reel's items as a plain list for screen readers and
+// keyboards. Without the 3D room, the picture is shown here on its own.
 
 interface Props {
   /** The reel this page opened on. Left out on pages that open in the room. */
@@ -18,75 +20,54 @@ const next = REELS[reel.number];
 const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id}/${item.id}`, item })));
 ---
 
-<div class="reel-layer" id="reel-layer" data-page={opened ? "reel" : undefined}>
-  <div class="reel-stage" id="reel-stage" data-reel={reel.id}>
-    <div class="frame" id="frame">
-      <canvas id="lobby-canvas" aria-label={`Reel ${reel.number}, ${reel.title}.`}></canvas>
-      <div class="film" aria-hidden="true"><canvas id="reel-grain"></canvas></div>
-      <div class="hud">
-        <ol class="hotbar" id="hotbar" aria-label="Hotbar"></ol>
-        <p class="item-label" id="item-label" aria-live="polite"></p>
-      </div>
-      <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
-      <p class="reel-title" id="reel-title" aria-hidden="true">
-        <span data-number>Reel {reel.number}</span>
-        <span data-name>{reel.title}</span>
-      </p>
-      <div class="corner">
-        <button id="lobby-sound" class="door sound" type="button" aria-pressed="false" aria-label="Sound">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
-            <g class="waves"><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path></g>
-            <g class="mute"><path d="M16 9.5l5 5M21 9.5l-5 5"></path></g>
-          </svg>
-        </button>
-        <button id="door-prev" class="door prev" type="button" hidden={!prev}>
-          <span aria-hidden="true">←</span>
-          <span data-label>{prev && `Reel ${prev.number} · ${prev.title}`}</span>
-        </button>
-      </div>
-      <button id="door-next" class="door next" type="button" hidden={!next}>
-        <span data-label>{next && `Reel ${next.number} · ${next.title}`}</span>
-        <span aria-hidden="true">→</span>
-      </button>
-    </div>
+<div class="reel-layer" id="reel-layer" data-reel={reel.id} data-page={opened ? "reel" : undefined}>
+  <!-- Without the 3D room, the reel's picture goes here. -->
+  <div class="reel-screen" id="reel-screen"></div>
 
-    {
-      REELS.map((r) => (
-        <section class="reel-panel" data-reel-panel={r.id} hidden={r.id !== reel.id} aria-labelledby={`panel-${r.id}`}>
-          <h1 id={`panel-${r.id}`}>
-            <span class="panel-number">Reel {r.number}</span> {r.title}
-          </h1>
-          <ul class="entries">
-            {reelItems[r.id].map((item) => (
-              <li>
-                <button class="entry" type="button" data-item={`${r.id}/${item.id}`} aria-haspopup="dialog">
-                  <span class="slot" data-icon={item.icon} />
-                  <span class="entry-text">
-                    <span class="entry-name" style={`color: ${ITEM_TYPES[item.type].color}`}>
-                      {item.name}
-                    </span>
-                    <span class="entry-sub">{item.sub}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))
-    }
+  {
+    REELS.map((r) => (
+      <section class="sr-only" data-reel-panel={r.id} hidden={r.id !== reel.id} aria-label={`Reel ${r.number}, ${r.title}`}>
+        <ul>
+          {reelItems[r.id].map((item) => (
+            <li>
+              <button type="button" data-item={`${r.id}/${item.id}`} aria-haspopup="dialog">
+                {item.name}, {item.sub}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+
+  <div class="corner">
+    <button id="lobby-sound" class="control sound" type="button" aria-pressed="false" aria-label="Sound">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
+        <g class="waves"><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path></g>
+        <g class="mute"><path d="M16 9.5l5 5M21 9.5l-5 5"></path></g>
+      </svg>
+    </button>
+    <!-- Ends the film: the camera pulls back from the screen to the couch. -->
+    <a id="end-film" class="control end-film" href="/" aria-label="End the film" title="End the film">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+    </a>
   </div>
+
+  <button id="door-prev" class="control door prev" type="button" hidden={!prev}>
+    <span aria-hidden="true">←</span>
+    <span data-label>{prev && `Reel ${prev.number} · ${prev.title}`}</span>
+  </button>
+  <button id="door-next" class="control door next" type="button" hidden={!next}>
+    <span data-label>{next && `Reel ${next.number} · ${next.title}`}</span>
+    <span aria-hidden="true">→</span>
+  </button>
 
   <noscript>
     <p class="noscript">The reels need JavaScript. Everything on them is also in <a href="/program">the program</a>.</p>
   </noscript>
-
-  <!-- Ends the film: the camera pulls back from the screen to the couch. -->
-  <a id="end-film" class="end-film" href="/" aria-label="End the film" title="End the film">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">
-      <path d="M6 6l12 12M18 6L6 18"></path>
-    </svg>
-  </a>
 
   <aside class="tuning" id="tuning" aria-label="Tuning" hidden></aside>
 
@@ -136,17 +117,13 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
 </div>
 
 <style>
-  /* Without the 3D room, a reel's address is a page of its own with the reel centered. */
+  /* Without the 3D room, a reel's address is a page of its own with the picture centered. */
   .reel-layer {
     min-height: 100vh;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
-    padding-block: 24px;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding: 64px max(16px, env(safe-area-inset-right, 0px)) 72px max(16px, env(safe-area-inset-left, 0px));
     background: #0b0806;
   }
 
@@ -154,8 +131,15 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     display: none;
   }
 
-  /* With the room: laid over the whole window, the reel placed on the room's screen by the page.
-     It shows while a reel plays, fading in as the camera reaches the screen. */
+  .reel-screen :global(.reel-picture) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 0 0 4px #000;
+    touch-action: none;
+  }
+
+  /* With the room: only the controls, in the margins around the screen. They show while a reel plays. */
   :global(html[data-mode]:not([data-mode="flat"])) .reel-layer {
     display: block;
     position: fixed;
@@ -179,191 +163,100 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     transition: opacity 0.45s ease;
   }
 
-  /* Going out, it gives way quickly to the same picture on the room's screen. */
   :global(html[data-mode="ending"]) .reel-layer {
     transition:
       opacity 0.2s ease,
       visibility 0s linear 0.2s;
   }
 
-  :global(html[data-mode]:not([data-mode="flat"])) .reel-stage {
-    position: absolute;
+  /* The room's controls: amber and cream mono, like the projector's buttons. */
+  .control {
     pointer-events: auto;
-  }
-
-  /* Holds the frame and the reel panel. --px is one game pixel on screen, set by the game. */
-  .reel-stage {
-    --px: 3px;
-    position: relative;
-    max-width: 100%;
-    container: reel / inline-size;
-  }
-
-  .frame {
-    position: relative;
-    box-shadow:
-      0 0 0 calc(var(--px) * 2) #000,
-      0 0 60px rgba(224, 163, 58, 0.12);
-  }
-
-  /* On the room's screen, the screen itself is the frame. */
-  :global(html[data-mode]:not([data-mode="flat"])) .frame {
-    box-shadow: none;
-  }
-
-  canvas {
-    display: block;
-    image-rendering: pixelated;
-    cursor: crosshair;
-    touch-action: none;
-  }
-
-  .hud {
-    position: absolute;
-    top: calc(var(--px) * 4);
-    left: calc(var(--px) * 4);
-    pointer-events: none;
-  }
-
-  .hotbar {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    gap: calc(var(--px) * 1);
-    pointer-events: auto;
-  }
-
-  .hotbar :global(.slot) {
-    position: relative;
-    width: calc(var(--px) * 20);
-    height: calc(var(--px) * 20);
-    padding: 0;
-    display: grid;
-    place-items: center;
-    background: rgba(30, 21, 14, 0.72);
-    border: var(--px) solid rgba(185, 170, 141, 0.55);
-    border-radius: calc(var(--px) * 1.5);
-    cursor: pointer;
-  }
-
-  .hotbar :global(.slot.selected) {
-    background: rgba(70, 48, 20, 0.84);
-    border-color: var(--amber);
-  }
-
-  .hotbar :global(.slot img) {
-    width: calc(var(--px) * 16);
-    height: calc(var(--px) * 16);
-    image-rendering: pixelated;
-  }
-
-  .hotbar :global(.slot .key),
-  .hotbar :global(.slot .count) {
-    position: absolute;
-    font-family: "Pixelify Sans", var(--font-mono);
-    font-size: max(10px, calc(var(--px) * 5));
-    line-height: 1;
-    color: #f4eedf;
-    text-shadow: 1px 1px 0 #000;
-  }
-
-  .hotbar :global(.slot .key) {
-    top: calc(var(--px) * 1);
-    left: calc(var(--px) * 2);
-    opacity: 0.7;
-  }
-
-  .hotbar :global(.slot .count) {
-    bottom: calc(var(--px) * 1);
-    right: calc(var(--px) * 2);
-  }
-
-  .item-label {
-    margin: calc(var(--px) * 2) 0 0;
-    font-family: "Pixelify Sans", var(--font-mono);
-    font-size: max(11px, calc(var(--px) * 6));
-    color: #f4eedf;
-    text-shadow: 1px 1px 0 #000;
-  }
-
-  .tooltip {
-    position: absolute;
-    z-index: 2;
-    min-width: 9rem;
-    padding: 0.5rem 0.7rem;
-    background: rgba(15, 11, 8, 0.92);
-    border: 1px solid rgba(236, 225, 201, 0.4);
-    border-radius: 2px;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    line-height: 1.35;
-    color: var(--ink);
-    pointer-events: none;
-  }
-
-  .tooltip[hidden] {
-    display: none;
-  }
-
-  .tooltip :global(p) {
-    margin: 0;
-  }
-
-  .tooltip :global(.tip-name) {
-    font-size: 1.05rem;
-    margin-bottom: 0.2rem;
-  }
-
-  .end-film {
-    pointer-events: auto;
-    position: fixed;
-    top: max(12px, env(safe-area-inset-top, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
-    z-index: 5;
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    padding: 0.55em 0.9em;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    line-height: 1.2;
     color: var(--ink);
     background: rgba(15, 11, 8, 0.82);
-    border: 1px solid rgba(236, 225, 201, 0.5);
+    border: 1px solid rgba(236, 225, 201, 0.45);
     border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
   }
 
-  .end-film:hover {
+  .control:hover {
     color: var(--amber);
     border-color: var(--amber);
   }
 
-  .end-film svg {
+  .control[hidden] {
+    display: none;
+  }
+
+  .corner {
+    position: fixed;
+    top: max(14px, env(safe-area-inset-top, 0px));
+    right: max(14px, env(safe-area-inset-right, 0px));
+    display: flex;
+    gap: 8px;
+  }
+
+  .corner .control {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
+
+  .corner svg {
     width: 18px;
     height: 18px;
   }
 
-  /* The room's film look over the reel: grain, a soft vignette, and a faint flicker. */
-  .film {
+  .sound .waves,
+  .sound[aria-pressed="true"] .mute {
+    display: none;
+  }
+
+  .sound[aria-pressed="true"] .waves {
+    display: inline;
+  }
+
+  /* Doors sit under the screen's corners, centered in the space below it. The page sets where the picture is. */
+  .door {
+    position: fixed;
+    bottom: max(14px, calc(var(--below-reel, 72px) / 2 - 1.1rem));
+  }
+
+  .door.prev {
+    left: max(14px, var(--reel-x, 16px));
+  }
+
+  .door.next {
+    right: max(14px, var(--reel-x, 16px));
+  }
+
+  .noscript {
+    margin: 0;
+    color: var(--ink-dim);
+  }
+
+  .sr-only {
     position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.28));
-    animation: flicker 0.25s steps(2) infinite;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
-
-  .film canvas {
-    width: 100%;
-    height: 100%;
-    opacity: 0.05;
-    mix-blend-mode: overlay;
-    image-rendering: pixelated;
-  }
-
-  @keyframes flicker {
-    50% {
-      opacity: 0.85;
-    }
-  }
-
 
   .tuning {
     position: fixed;
@@ -441,247 +334,22 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     color: var(--amber);
   }
 
-  /* The reel's name, shown like an intertitle at the start of each reel. */
-  .reel-title {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    display: grid;
-    place-content: center;
-    gap: calc(var(--px) * 3);
-    text-align: center;
-    color: var(--ink);
-    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .reel-title [data-number] {
-    font-family: var(--font-mono);
-    font-size: max(11px, calc(var(--px) * 4.5));
-    letter-spacing: 0.32em;
-    text-transform: uppercase;
-    color: var(--amber);
-  }
-
-  .reel-title [data-name] {
-    font-family: var(--font-display);
-    font-variation-settings: "SOFT" 100;
-    font-weight: 600;
-    font-size: max(30px, calc(var(--px) * 17));
-    line-height: 1;
-  }
-
-  .reel-title:global(.show) {
-    animation: reel-title 2.2s ease both;
-  }
-
-  @keyframes reel-title {
-    0% {
-      opacity: 0;
-      transform: translateY(calc(var(--px) * 3));
-    }
-    14%,
-    70% {
-      opacity: 1;
-      transform: none;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
-  @keyframes reel-title-still {
-    0%,
-    100% {
-      opacity: 0;
-    }
-    14%,
-    70% {
-      opacity: 1;
-    }
-  }
-
-  /* Door buttons: the character walks out that side, then the film cuts. The sound
-     toggle shares their look and sits in the bottom-left corner beside the left door. */
-  .corner {
-    position: absolute;
-    left: calc(var(--px) * 4);
-    bottom: calc(var(--px) * 4);
-    display: flex;
-    gap: calc(var(--px) * 2);
-  }
-
-  .door {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6em;
-    padding: max(5px, calc(var(--px) * 2.2)) max(9px, calc(var(--px) * 4));
-    font-family: var(--font-mono);
-    font-size: max(10px, calc(var(--px) * 4.2));
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    line-height: 1.2;
-    color: var(--ink);
-    background: rgba(15, 11, 8, 0.82);
-    border: 1px solid rgba(236, 225, 201, 0.45);
-    border-radius: 2px;
-    cursor: pointer;
-  }
-
-  .door:hover {
-    color: var(--amber);
-    border-color: var(--amber);
-  }
-
-  .door.next {
-    position: absolute;
-    right: calc(var(--px) * 4);
-    bottom: calc(var(--px) * 4);
-  }
-
-  .sound {
-    padding-inline: max(6px, calc(var(--px) * 2.5));
-  }
-
-  .sound svg {
-    width: 1.2em;
-    height: 1.2em;
-  }
-
-  .sound .waves,
-  .sound[aria-pressed="true"] .mute {
-    display: none;
-  }
-
-  .sound[aria-pressed="true"] .waves {
-    display: inline;
-  }
-
-  .door[hidden] {
-    display: none;
-  }
-
-  /* The reel's content as items. Over the frame's top right when there's room, under it otherwise.
-     --u is the panel's pixel size: fixed under the frame, the game's pixel over it. */
-  .reel-panel {
-    --u: 2px;
-    margin-top: 1rem;
-    padding: 0.9rem 1rem;
-    color: var(--ink);
-    font-family: var(--font-body);
-    background: rgba(15, 11, 8, 0.86);
-    border: 1px solid rgba(236, 225, 201, 0.45);
-    border-radius: 2px;
-    box-shadow:
-      inset 0 0 0 4px rgba(15, 11, 8, 0.86),
-      inset 0 0 0 5px rgba(224, 163, 58, 0.3);
-  }
-
-  .reel-panel[hidden] {
-    display: none;
-  }
-
-  @container reel (min-width: 600px) {
-    .reel-panel {
-      --u: var(--px);
-      position: absolute;
-      top: calc(var(--u) * 4);
-      right: calc(var(--u) * 4);
-      width: calc(var(--u) * 132);
-      margin: 0;
-      padding: calc(var(--u) * 4.5) calc(var(--u) * 5);
-    }
-  }
-
-  .reel-panel h1 {
-    margin: 0 0 calc(var(--u) * 3);
-    font-family: var(--font-display);
-    font-variation-settings: "SOFT" 100;
-    font-size: max(16px, calc(var(--u) * 7.5));
-    font-weight: 500;
-    line-height: 1.1;
-  }
-
-  .panel-number {
-    display: block;
-    margin-bottom: 0.3em;
-    font-family: var(--font-mono);
-    font-size: max(9px, calc(var(--u) * 3.4));
-    letter-spacing: 0.24em;
-    text-transform: uppercase;
-    color: var(--amber);
-  }
-
-  .entries {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: calc(var(--u) * 1.5);
-  }
-
-  .entry {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: calc(var(--u) * 3);
-    width: 100%;
-    padding: calc(var(--u) * 1);
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    cursor: pointer;
-  }
-
-  .entry:hover,
-  .entry:focus-visible {
-    background: rgba(224, 163, 58, 0.12);
-    border-color: rgba(224, 163, 58, 0.55);
-  }
-
   .slot {
-    width: calc(var(--u) * 20);
-    height: calc(var(--u) * 20);
+    width: 60px;
+    height: 60px;
     display: grid;
     place-items: center;
     flex: none;
-    background: rgba(30, 21, 14, 0.72);
-    border: 1px solid rgba(185, 170, 141, 0.5);
     border-radius: 2px;
   }
 
   .slot :global(img) {
-    width: calc(var(--u) * 16);
-    height: calc(var(--u) * 16);
+    width: 48px;
+    height: 48px;
     image-rendering: pixelated;
   }
 
-  .entry-name {
-    display: block;
-    font-weight: 600;
-    font-size: max(13px, calc(var(--u) * 5.6));
-    line-height: 1.2;
-  }
-
-  .entry-sub {
-    display: block;
-    margin-top: 0.2em;
-    font-family: var(--font-mono);
-    font-size: max(10px, calc(var(--u) * 3.9));
-    line-height: 1.35;
-    color: var(--ink-dim);
-  }
-
-  .noscript {
-    margin: 0;
-    color: var(--ink-dim);
-  }
-
-  /* An item's card: the full tooltip, opened from the panel. */
+  /* An item's card, opened from the panel on the screen: printed on the program's cream paper. */
   .item-card {
     width: min(30rem, calc(100% - 32px));
     max-height: calc(100% - 32px);
@@ -814,15 +482,5 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
   .close:hover {
     color: #a8481f;
     border-color: #a8481f;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .film {
-      animation: none;
-    }
-
-    .reel-title:global(.show) {
-      animation-name: reel-title-still;
-    }
   }
 </style>

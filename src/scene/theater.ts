@@ -6,6 +6,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import type { ReelId } from "../data";
+import { HEIGHT as GAME_HEIGHT, WIDTH as GAME_WIDTH } from "../lobby/config";
 import { paintReelStill } from "../lobby/still";
 import { buildBeam, buildRoomDust, type Beam } from "./beam";
 import { COUNT_STEP, Film } from "./film";
@@ -25,7 +26,7 @@ import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures
  * - program: the program is picked up and held in front of the camera
  * - playing: the start sequence is running
  * - entering: the camera has reached the screen and the reel is fading in over it
- * - reel: a reel is playing on the screen; the room is drawn at film speed around it
+ * - reel: a reel is playing on the screen, drawn into the room as the screen's picture
  * - ending: the ending sequence is running
  */
 export type Mode = "idle" | "program" | "playing" | "entering" | "reel" | "ending";
@@ -84,6 +85,8 @@ interface SceneState {
   flip: number;
   /** Which inside page is centered while it's open (see ProgramView). */
   focus: number;
+  /** The live reel on the screen: 0 hidden, 1 showing. */
+  reel: number;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -98,8 +101,6 @@ const IDLE_LOOK = { grain: 0.045, flicker: 0.0, weave: 0.0 };
 const FILM_LOOK = { grain: 0.1, flicker: 0.1, weave: 1.4 };
 /** While a reel plays: no gate weave, so the room's screen stays lined up with the reel drawn over it. */
 const REEL_LOOK = { grain: 0.05, flicker: 0.02, weave: 0 };
-/** Rendering rate for the room while a reel plays over it. */
-const REEL_FPS = 24;
 /** The lamps while a reel plays: house lights at a low glow, so the room stays visible around the screen. */
 const REEL_LAMP = 0.28;
 
@@ -133,6 +134,8 @@ export class Theater {
   private film!: Film;
   private program!: ProgramPaper;
   private veil!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private picture: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; texture: THREE.CanvasTexture } | null =
+    null;
   private screenLight!: THREE.RectAreaLight;
   private spot!: THREE.SpotLight;
   private ventLight!: THREE.PointLight;
@@ -151,6 +154,7 @@ export class Theater {
     open: PROGRAM.open,
     flip: 0,
     focus: 0,
+    reel: 0,
   };
   private tl: gsap.core.Timeline | null = null;
   private paperTl: gsap.core.Timeline | null = null;
@@ -450,10 +454,38 @@ export class Theater {
     }
   }
 
+  /**
+   * The reels' picture (the game, with its interface drawn in). It plays on the screen as the
+   * screen's own image, so things in front of the screen stay in front of it.
+   */
+  setPicture(canvas: HTMLCanvasElement) {
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0, depthWrite: false });
+    // A touch brighter than the texture, to read like light on the screen after tone mapping.
+    material.color.setScalar(1.2);
+    const width = IMAGE.width;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, (width * GAME_HEIGHT) / GAME_WIDTH), material);
+    mesh.position.copy(SCREEN.center);
+    mesh.position.z += 0.002;
+    mesh.visible = false;
+    this.room.group.add(mesh);
+    this.picture = { mesh, texture };
+  }
+
+  /** Where this point of the window lands on the reel's picture, in game pixels, or null if it misses. */
+  pictureAt(clientX: number, clientY: number) {
+    if (!this.picture?.mesh.visible) return null;
+    const uv = this.raycast(clientX, clientY, [this.picture.mesh])[0]?.uv;
+    return uv ? { x: uv.x * GAME_WIDTH, y: (1 - uv.y) * GAME_HEIGHT } : null;
+  }
+
   /** The page opened on a reel: the film is already running and the camera is at the screen. */
   enterReel(reel: ReelId) {
     if (this.mode !== "idle") return;
-    Object.assign(this.state, { cam: 1, lamp: REEL_LAMP, beam: 1, screen: 1, running: 1, reels: 1, ...REEL_LOOK });
+    Object.assign(this.state, { cam: 1, lamp: REEL_LAMP, beam: 1, screen: 1, running: 1, reels: 1, reel: 1, ...REEL_LOOK });
     this.showReel(reel);
     this.setMode("reel");
   }
@@ -486,19 +518,16 @@ export class Theater {
     window.setTimeout(() => this.finishEnter(), 450);
   }
 
-  /** Run the ending: the screen shows the reel that was playing, the film runs out, the camera pulls back, the lights come up. */
-  end(reel: ReelId) {
+  /** Run the ending: the reel holds on its last frame, the film runs out, the camera pulls back, the lights come up. */
+  end() {
     if (this.mode !== "reel") return;
     const s = this.state;
     this.tl?.kill();
-    Object.assign(s, { cam: 1, beam: 1, screen: 1, running: 1, reels: 1, ...FILM_LOOK, fade: 0 });
-    this.film.show(paintReelStill(reel));
-    this.film.set("reel");
+    Object.assign(s, { cam: 1, beam: 1, screen: 1, running: 1, reels: 1, reel: 1, ...FILM_LOOK, fade: 0 });
     this.setMode("ending");
-    this.startLoop();
 
     if (this.opts.reducedMotion) {
-      Object.assign(s, { cam: 0, lamp: 1, beam: 0, screen: 0, running: 0, reels: 0, ...IDLE_LOOK });
+      Object.assign(s, { cam: 0, lamp: 1, beam: 0, screen: 0, running: 0, reels: 0, reel: 0, ...IDLE_LOOK });
       this.film.set("dark");
       window.setTimeout(() => this.setMode("idle"), 450);
       return;
@@ -511,6 +540,7 @@ export class Theater {
       this.film.set("runout");
       this.sound.runout(1.2);
     }, [], 0.7);
+    tl.to(s, { reel: 0, duration: 0.2 }, 0.7);
     tl.to(s, { cam: 0, duration: 1.4, ease: "power2.inOut" }, 0.8);
     tl.to(s, { beam: 0, screen: 0, running: 0, duration: 0.35, ease: "power1.in" }, 1.65);
     tl.call(() => this.film.set("dark"), [], 2.0);
@@ -520,7 +550,9 @@ export class Theater {
     tl.to(s, { ...IDLE_LOOK, duration: 0.8 }, 2.0);
   }
 
+  /** The camera has reached the screen: the reel fades in on it. */
   private beginCrossfade() {
+    gsap.to(this.state, { reel: 1, duration: this.quick(0.45), ease: "power1.out" });
     this.setMode("entering");
   }
 
@@ -590,8 +622,6 @@ export class Theater {
     this.last = performance.now();
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick);
-      // While a reel plays over it, the room only needs film speed.
-      if (this.mode === "reel" && now - this.last < 1000 / REEL_FPS) return;
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.time += dt;
@@ -696,6 +726,14 @@ export class Theater {
 
     this.applyCamera();
     this.placeProgram();
+
+    // The live reel on the screen, refreshed every frame while it shows.
+    if (this.picture) {
+      const { mesh, texture } = this.picture;
+      mesh.visible = s.reel > 0.001;
+      mesh.material.opacity = s.reel;
+      if (mesh.visible) texture.needsUpdate = true;
+    }
   }
 
   /** Stand the program on the table, or hold it in front of the camera, or somewhere in between. */

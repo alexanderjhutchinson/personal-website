@@ -20,9 +20,72 @@ const { open, reel } = Astro.props;
 
 <Stage open={open} />
 <Reel reel={reel} />
-{!reel && <ProgramView />}
+<ProgramView reelPage={!!reel} />
+
+<!-- The room is made for a wide screen. Narrower ones get this, with the program as a way in. -->
+<div class="widen" role="dialog" aria-modal="true" aria-labelledby="widen-title">
+  <p class="label">Home movie night</p>
+  <p class="widen-title" id="widen-title">
+    <span class="coarse">Turn your phone sideways</span><span class="fine">Widen your window</span>
+  </p>
+  <p class="widen-note">The living room and its feature need a wide screen.</p>
+  <button class="reel-button" type="button" data-plain>Read the program instead</button>
+</div>
 
 <script>
   import { boot } from "../scene/boot";
   boot();
 </script>
+
+<style>
+  .widen {
+    display: none;
+  }
+
+  @media (max-aspect-ratio: 6/5) {
+    :global(html[data-mode]:not([data-mode="flat"]):not([data-plain])) .widen {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 0.9rem;
+      padding: 24px;
+      text-align: center;
+      background: var(--night);
+    }
+  }
+
+  .label {
+    margin: 0;
+    color: var(--amber);
+  }
+
+  .widen-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-variation-settings: "SOFT" 100;
+    font-weight: 600;
+    font-size: var(--step-2);
+    line-height: 1.1;
+  }
+
+  .widen-note {
+    margin: 0 0 0.6rem;
+    color: var(--ink-dim);
+  }
+
+  .coarse {
+    display: none;
+  }
+
+  @media (hover: none) {
+    .fine {
+      display: none;
+    }
+    .coarse {
+      display: inline;
+    }
+  }
+</style>

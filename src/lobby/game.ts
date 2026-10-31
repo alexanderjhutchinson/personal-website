@@ -2,10 +2,10 @@ import { COLS, HEIGHT, ROWS, TILE, WIDTH, loadTuning, type Tuning } from "./conf
 import { mountContent } from "./content";
 import { drawLight, drawSet } from "./draw";
 import { Drop, Dummy, Floater, Particle, burst } from "./entities";
-import { startGrain } from "./grain";
-import { mountHotbar, mountTuning } from "./hud";
+import { mountTuning } from "./hud";
 import { Inventory } from "./inventory";
 import { ITEMS } from "./items";
+import { Overlay, SCALE } from "./overlay";
 import { makeCanvas } from "./pixels";
 import { Player, type Controls } from "./player";
 import { SCENES, type ReelScene } from "./scenes";
@@ -48,24 +48,26 @@ function rectsOverlap(a: { x: number; y: number; w: number; h: number }, b: { x:
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-/** A part of the window, in CSS pixels. */
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 /** What the living room controls about the reels. */
 export interface Lobby {
   /** The reel that's loaded. */
   readonly reel: ReelId;
+  /**
+   * The reel as one picture: the scene with its interface drawn on top, SCALE times the game's
+   * resolution. The room shows it on its screen.
+   */
+  readonly picture: HTMLCanvasElement;
   /** Jump straight to a reel, with no roll, the character at its start. */
   open(reel: ReelId): void;
   /** Run the game and take the keyboard and pointer, or pause it. */
   setActive(on: boolean): void;
-  /** Fit the reel into this part of the window (the room's screen), or into the whole window when null. */
-  place(rect: Rect | null): void;
+  /** Pointer input, in game pixels (the room traces it through its screen). */
+  pointer(kind: "move" | "down" | "up" | "leave", x?: number, y?: number): void;
+  wheel(deltaY: number): void;
+  /** The cursor to show over this point of the picture. */
+  cursorAt(x: number, y: number): string;
+  /** Without the room, show the picture on its own in this element and take the pointer from it. */
+  mount(container: HTMLElement): void;
   /** Sound turned on or off elsewhere (the room's sound button). */
   setSound(on: boolean): void;
 }
@@ -76,26 +78,20 @@ export interface LobbyOptions {
 }
 
 export function startLobby(opts: LobbyOptions = {}): Lobby | null {
-  const canvas = document.getElementById("lobby-canvas") as HTMLCanvasElement | null;
-  const frame = document.getElementById("frame");
-  const hotbar = document.getElementById("hotbar");
-  const tooltip = document.getElementById("tooltip");
-  const label = document.getElementById("item-label");
+  const layer = document.getElementById("reel-layer");
   const tuningPanel = document.getElementById("tuning");
   const soundButton = document.getElementById("lobby-sound");
-  const stage = document.getElementById("reel-stage");
   const prevButton = document.getElementById("door-prev");
   const nextButton = document.getElementById("door-next");
-  const titleCard = document.getElementById("reel-title");
-  if (!canvas || !frame || !stage || !hotbar || !tooltip || !label || !tuningPanel) return null;
-  const screen = canvas.getContext("2d");
-  if (!screen) return null;
+  if (!layer || !tuningPanel) return null;
 
   const tuning = loadTuning();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  mountContent();
-  const grain = document.getElementById("reel-grain");
-  if (grain instanceof HTMLCanvasElement) startGrain(grain, reduceMotion.matches);
+  const content = mountContent();
+
+  // The picture the room projects: the scene, scaled up with crisp pixels, and the interface drawn sharp on top.
+  const { c: picture, ctx: pctx } = makeCanvas(WIDTH * SCALE, HEIGHT * SCALE);
+  picture.className = "reel-picture";
 
   const states = new Map<Reel["id"], ReelState>();
   const stateFor = (reel: Reel) => {
@@ -109,7 +105,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     return state;
   };
 
-  let here = stateFor(REELS.find((r) => r.id === stage.dataset.reel) ?? reelAt(location.pathname) ?? REELS[0]);
+  let here = stateFor(REELS.find((r) => r.id === layer.dataset.reel) ?? reelAt(location.pathname) ?? REELS[0]);
   let { world, dummy, scene } = here;
   let player = new Player(scene.spawn.x, scene.spawn.y);
   let drops: Drop[] = [];
@@ -129,7 +125,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     inv.put(2, "torch", 99);
     inv.select(0);
   };
-  mountHotbar(hotbar, tooltip, label, inv);
+  const overlay = new Overlay(inv);
   stockInventory();
 
   const resetScene = () => {
@@ -213,38 +209,34 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     mouse.down = false;
   });
 
-  const toLogical = (e: PointerEvent | WheelEvent) => {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * WIDTH;
-    mouse.y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+  // Pointer input arrives in game pixels: traced through the room's screen, or from the picture on its own.
+  const pointer: Lobby["pointer"] = (kind, x = -100, y = -100) => {
+    if (!active) return;
+    if (kind === "leave") {
+      mouse.inside = false;
+      mouse.down = false;
+      overlay.hover = null;
+      return;
+    }
+    mouse.x = x;
+    mouse.y = y;
+    mouse.inside = true;
+    overlay.hover = overlay.at(x, y);
+    if (kind === "down") {
+      lastInput = time;
+      if (soundOn) sfx.setEnabled(true);
+      const hit = overlay.at(x, y);
+      if (hit?.kind === "slot") inv.select(hit.index);
+      else if (hit?.kind === "item") content?.open(hit.key);
+      // A click on the interface isn't a click in the world.
+      else if (!overlay.covers(x, y)) mouse.down = true;
+    } else if (kind === "up") {
+      mouse.down = false;
+    }
   };
-  canvas.addEventListener("pointermove", (e) => {
-    toLogical(e);
-    mouse.inside = true;
-  });
-  canvas.addEventListener("pointerleave", () => {
-    mouse.inside = false;
-    mouse.down = false;
-  });
-  canvas.addEventListener("pointerdown", (e) => {
-    toLogical(e);
-    mouse.inside = true;
-    mouse.down = true;
-    lastInput = time;
-    canvas.setPointerCapture(e.pointerId);
-    if (soundOn) sfx.setEnabled(true);
-  });
-  canvas.addEventListener("pointerup", () => (mouse.down = false));
-  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-  canvas.addEventListener(
-    "wheel",
-    (e) => {
-      if (!active) return;
-      e.preventDefault();
-      inv.select(inv.selected + Math.sign(e.deltaY));
-    },
-    { passive: false },
-  );
+  const wheel = (deltaY: number) => {
+    if (active) inv.select(inv.selected + Math.sign(deltaY));
+  };
 
   const controls = (): Controls => ({
     left: keys.has("KeyA") || keys.has("ArrowLeft"),
@@ -345,7 +337,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
   const renderReel = () => {
     const { reel } = here;
     if (active) document.title = `${reel.title} · ${person.name}`;
-    canvas.setAttribute("aria-label", `Reel ${reel.number}, ${reel.title}. ${scene.alt}`);
+    picture.setAttribute("aria-label", `Reel ${reel.number}, ${reel.title}. ${scene.alt}`);
     for (const panel of panels) panel.hidden = panel.dataset.reelPanel !== reel.id;
     for (const [button, target] of [
       [prevButton, neighbor(-1)],
@@ -358,16 +350,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     }
   };
 
-  const showTitle = () => {
-    if (!titleCard) return;
-    const number = titleCard.querySelector("[data-number]");
-    const name = titleCard.querySelector("[data-name]");
-    if (number) number.textContent = `Reel ${here.reel.number}`;
-    if (name) name.textContent = here.reel.title;
-    titleCard.classList.remove("show");
-    void titleCard.offsetWidth; // restart the animation
-    titleCard.classList.add("show");
-  };
+  const showTitle = () => overlay.showTitle(here.reel, time);
 
   /** Cut to another reel. The character comes in through the door on the side it left from. */
   const go = (reel: Reel, dir: 1 | -1, push = true) => {
@@ -514,7 +497,7 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
 
     // Highlight the block under the cursor when the selected item can act on it.
     const slot = inv.current;
-    if (mouse.inside && slot && ITEMS[slot.item].use !== "swing") {
+    if (mouse.inside && !overlay.covers(mouse.x, mouse.y) && slot && ITEMS[slot.item].use !== "swing") {
       const { tx, ty, inReach } = target();
       if (inReach) {
         ctx.strokeStyle = "rgba(255, 240, 200, 0.7)";
@@ -524,8 +507,9 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     }
     ctx.restore();
 
-    screen.imageSmoothingEnabled = false;
-    screen.drawImage(transition ? rollFilm(transition.t / ROLL_TIME, transition.dir) : buffer, 0, 0, canvas.width, canvas.height);
+    pctx.imageSmoothingEnabled = false;
+    pctx.drawImage(transition ? rollFilm(transition.t / ROLL_TIME, transition.dir) : buffer, 0, 0, picture.width, picture.height);
+    overlay.draw(pctx, here.reel, time);
   };
 
   /**
@@ -545,31 +529,13 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
     return rollFrame;
   };
 
-  // Size the frame. On the room's screen it fills the picture's width, centered top to bottom like a
-  // film letterboxed in the gate. On its own it fits the window, in whole-pixel multiples when there's room.
-  let rect: Rect | null = null;
+  // Without the room, the picture is shown on its own, fitted to the window.
+  let mounted = false;
   const resize = () => {
-    let s: number;
-    if (rect) {
-      s = rect.w / WIDTH;
-    } else {
-      s = Math.min((document.documentElement.clientWidth - 32) / WIDTH, (window.innerHeight - 100) / HEIGHT);
-      if (s >= 2) s = Math.floor(s);
-      s = Math.max(s, 0.5);
-    }
-    const cssW = Math.round(WIDTH * s);
-    const cssH = Math.round(HEIGHT * s);
-    const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    stage.style.setProperty("--px", `${s}px`);
-    stage.style.width = `${cssW}px`;
-    stage.style.left = rect ? `${Math.round(rect.x)}px` : "";
-    stage.style.top = rect ? `${Math.round(rect.y + (rect.h - cssH) / 2)}px` : "";
+    if (!mounted) return;
+    const w = Math.min(document.documentElement.clientWidth - 32, ((window.innerHeight - 100) * WIDTH) / HEIGHT);
+    picture.style.width = `${Math.max(240, Math.round(w))}px`;
   };
-  resize();
   window.addEventListener("resize", resize);
   renderReel();
 
@@ -654,9 +620,43 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
         mouse.down = false;
       }
     },
-    place(next) {
-      rect = next;
+    get picture() {
+      return picture;
+    },
+    pointer,
+    wheel,
+    cursorAt(x, y) {
+      return overlay.at(x, y) ? "pointer" : overlay.covers(x, y) ? "default" : "crosshair";
+    },
+    mount(container) {
+      if (mounted) return;
+      mounted = true;
+      container.append(picture);
       resize();
+      const toGame = (e: PointerEvent | MouseEvent) => {
+        const r = picture.getBoundingClientRect();
+        return [((e.clientX - r.left) / r.width) * WIDTH, ((e.clientY - r.top) / r.height) * HEIGHT] as const;
+      };
+      picture.addEventListener("pointermove", (e) => {
+        const [x, y] = toGame(e);
+        pointer("move", x, y);
+        picture.style.cursor = this.cursorAt(x, y);
+      });
+      picture.addEventListener("pointerdown", (e) => {
+        picture.setPointerCapture(e.pointerId);
+        pointer("down", ...toGame(e));
+      });
+      picture.addEventListener("pointerup", (e) => pointer("up", ...toGame(e)));
+      picture.addEventListener("pointerleave", () => pointer("leave"));
+      picture.addEventListener("contextmenu", (e) => e.preventDefault());
+      picture.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          wheel(e.deltaY);
+        },
+        { passive: false },
+      );
     },
     setSound(on) {
       soundOn = on;

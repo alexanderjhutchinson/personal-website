@@ -2,11 +2,21 @@
 import Program from "./Program.astro";
 
 // The program as a plain page, for when the 3D room can't run (no WebGL or no
-// JavaScript). With the room running it stays hidden: the program is the paper
-// on the coffee table.
+// JavaScript), and for screens too narrow for the room ("Read the program
+// instead"). Otherwise it stays hidden: the program is the paper on the coffee table.
+
+interface Props {
+  /** On a reel's address, where the page without the room is the reel, not the program. */
+  reelPage?: boolean;
+}
+
+const { reelPage } = Astro.props;
 ---
 
-<div class="program-view" id="program-view">
+<div class="program-view" id="program-view" data-reel-page={reelPage ? "" : undefined}>
+  <div class="plain-bar">
+    <button class="reel-button" type="button" data-plain-close>Back</button>
+  </div>
   <Program />
 </div>
 
@@ -15,7 +25,39 @@ import Program from "./Program.astro";
     padding: clamp(1.5rem, 5vh, 3rem) max(16px, env(safe-area-inset-right, 0px)) 4rem max(16px, env(safe-area-inset-left, 0px));
   }
 
-  :global(html[data-mode]:not([data-mode="flat"])) .program-view {
+  :global(html[data-mode]:not([data-mode="flat"]):not([data-plain])) .program-view,
+  :global(html:not([data-plain])) .program-view[data-reel-page] {
     display: none;
+  }
+
+  /* Read from the "too narrow" note: over everything, scrollable, with a way back. */
+  :global(html[data-plain]) .program-view {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    overflow-y: auto;
+    padding-top: 0;
+    background: var(--night);
+  }
+
+  .plain-bar {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    justify-content: flex-start;
+    margin: 0 -16px 1.25rem;
+    padding: max(14px, env(safe-area-inset-top, 0px)) 16px 14px;
+    background: linear-gradient(var(--night) 70%, rgba(15, 11, 8, 0));
+  }
+
+  :global(html[data-plain]) .plain-bar {
+    display: flex;
+  }
+
+  .plain-bar .reel-button {
+    padding: 0.5em 0.85em;
+    font-size: 0.7rem;
   }
 </style>

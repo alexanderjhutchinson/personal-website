@@ -155,24 +155,22 @@ The critique after #3: the landing page and the feature still didn't feel like o
 ### Status: built (branch `one-room`)
 
 - **The site never leaves the room.** The reels play on the pull-down screen. After the opening the camera stops square-on to the screen with the picture filling about three quarters of the view, so the screen's black border, the paneling, the plant and the radio stay around it. The lamps come back up to a low glow once the reel is on, like house lights at half.
-- **The game is laid exactly over the screen's picture.** The page works out where the picture sits from the window size alone (`src/scene/screen.ts`), so a reel can be placed before three.js has loaded. While a reel plays, the room is drawn at 24 frames a second with no gate weave, so the screen stays lined up with the reel.
-- **One page.** `/`, `/program` and each reel's address are the same page in different states. Going into the film adds the reel's address to the history; the × and the back button play the ending (the reel gives way to the same picture on the room's screen, the film runs out, the camera pulls back) with no page load.
-- **A reel's address** opens with that reel already on the screen and the room fading in around it.
-- **One visual language.** Pixel art stays inside the film (the scenes and the in-game hotbar, whose slots are now warm brown). Everything around it uses the room's look:
-  - the item panel: a dark card with the room's double rule, a Fraunces heading, body type, and mono details
-  - the door and sound buttons and the ×: the room's amber and cream mono buttons
-  - each reel's title: a silent-film title card (mono "REEL 2" in amber over the name in Fraunces)
-  - item cards: printed on the program's cream paper, with its double rule
-  - item name colors warmed to the room's palette: burnt orange for school, amber for work, avocado for projects
-- Sound is shared: the reel's speaker button and the room's sound button are the same setting.
-- Without WebGL, `/` and `/program` show the program on its own and a reel's address shows the reel on its own, as before.
+- **The game plays as the screen's own picture, in 3D.** The game draws one picture (the scene, with its interface drawn on top at three times the game's resolution so text stays sharp), and the room shows it on the screen every frame. So the plant stands in front of it, the projector beam and the dust cross it, the room's grain falls on it, and it's exactly the screen's shape. (A first try laid the game over the page on top of the 3D room; it cut through the plant, the beam and the dust and never quite lined up, so it was dropped.)
+- **The interface is part of the picture:** the hotbar, item tooltips, the item panel (top right, in the room's style: dark card, double rule, Fraunces heading), and each reel's title card. Pointer input is traced through the screen into the game, so mining, the hotbar and the panel work by clicking the screen.
+- **The room's own controls sit in the margins**, never on the screen: sound and the × top right, and the door buttons under the screen's corners, in the room's amber and cream.
+- **Item cards** pop up over everything on the program's cream paper. The reel's items also exist as a hidden list for screen readers and keyboards.
+- **One page.** `/`, `/program` and each reel's address are the same page in different states. Going into the film adds the reel's address to the history; the × and the back button play the ending (the reel holds a beat, the film runs out, the camera pulls back) with no page load. A reel's address opens with that reel already on the screen.
+- **Wide screens only.** Anything narrower than 6:5 (an upright phone, a narrow window) gets a note in the room's style: "Turn your phone sideways" or "Widen your window", with "Read the program instead" opening the plain program.
+- Item name colors are warmed to the room's palette: burnt orange for school, amber for work, avocado for projects. The in-game hotbar slots are warm brown.
+- Sound is shared between the room and the reels. Without WebGL, `/` and `/program` show the program on its own and a reel's address shows the reel's picture on its own.
 
-Checked in Chromium at 16:9 and phone sizes: from the couch into Reel 1, a reel's address directly, doors between reels on the screen, the item card, the ×, back and forward between the room and a reel, and `/program` into Reel 2 from the cover. The page's script is 21 KB gzipped; the room (three.js) still loads after it. Not tested: Safari, Firefox, real phones, and a browser without WebGL.
+Checked in Chromium at 16:9, an upright phone, and a phone held sideways: from the couch into Reel 1, a reel's address directly, clicking an item on the screen (opens its card), choosing a hotbar slot and mining a block through the screen, the ×, the "too narrow" note and the plain program. The page's script is 22 KB gzipped; three.js still loads after it. Not tested: Safari, Firefox, real phones, and a browser without WebGL.
 
-Not done yet:
+Open:
 
+- **Phones held sideways:** it works, but the picture is small (about 480 pixels wide), so the item panel's and hotbar's text is too small to read. Options: draw the interface bigger on small screens, or move the item list into the room's side margins there.
 - A pass on the pixel palette toward the room's 70s colors (mustard, burnt orange, avocado, teak).
-- The reel's light on the room is a still of the reel's first frame, not the live picture.
+- The room renders at full speed while a reel plays (the screen's picture changes every frame); worth checking on a slower laptop.
 
 ## Phase 2: the world and how info is communicated
 

@@ -30,9 +30,9 @@ Then open http://localhost:4321.
 | `src/pages/index.astro`, `program.astro`, `[reel].astro` | Every address is the same room, opened in a different state: on the couch, with the program in hand, or with a reel playing on the screen. |
 | `src/components/Room.astro` | The one page: the stage, the reels, and the program for when the room can't run. |
 | `src/components/Stage.astro` | Canvas and everything over the room: sound, the pick-up prompt, the controls while holding the program. |
-| `src/components/Reel.astro` | The reels: game canvas, door buttons, sound, the item panel and cards, and the ×. Laid over the room's screen, or a page of its own without the room. |
+| `src/components/Reel.astro` | What sits around the reel: the door buttons, sound and × in the margins, the item cards, and the reel's items as a list for screen readers. Without the room, the reel's picture shows here on its own. |
+| `src/components/ProgramView.astro` | The program as a plain page: without the room, and from the "too narrow" note. |
 | `src/components/Program.astro` | The program in HTML, printed on cream paper. |
-| `src/components/ProgramView.astro` | The program as the whole page, shown only without JavaScript or WebGL. |
 | `src/scene/theater.ts` | The 3D controller: renderer, camera framing, and the opening, skip, and ending sequences (GSAP timelines). |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, window, screen. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
@@ -44,9 +44,10 @@ Then open http://localhost:4321.
 | `src/scene/sound.ts` | Projector sounds, synthesized with Web Audio. |
 | `src/scene/textures.ts` | Every surface texture, painted on canvases at load time. |
 | `src/scene/layout.ts` | Room dimensions and where everything sits. |
-| `src/scene/screen.ts` | The screen's size, and where its picture sits on the page while a reel plays (no three.js, so a reel can be placed before the room loads). |
+| `src/scene/screen.ts` | The screen's size, and where its picture sits on the page while a reel plays (no three.js, so the page can lay out the controls before the room loads). |
 | `src/scene/boot.ts` | Runs the page: buttons, keys, sound, first-visit tracking, the program, and taking the reels on and off the room's screen with the browser history to match. |
-| `src/lobby/game.ts` | The reels' game loop: input, item use, switching reels, the frame roll. The room starts, pauses, and places it. |
+| `src/lobby/game.ts` | The reels' game loop: input, item use, switching reels, the frame roll. It draws one picture, which the room plays on its screen; the room starts and pauses it and passes it the pointer. |
+| `src/lobby/overlay.ts` | The reel's interface, drawn into the picture: hotbar, item tooltips, the item panel, and the reel's title card. |
 | `src/lobby/scenes.ts` | The three scenes (home base, mine, workshop): layout, doors, light, backdrop, props. |
 | `src/lobby/world.ts` | The tile grid, mining, the edge doorways, and the light map. |
 | `src/lobby/player.ts` | Movement, jumping, wandering, and walking to a door. |
@@ -61,7 +62,8 @@ Then open http://localhost:4321.
 - **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves up to it; the reel fades in on the screen: Reel 1 (`/about`), or the one picked in the program. The camera stops short, so the screen's border and the room stay around the reel, with the lamps at a low glow.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.
-- **Ending:** the × in the top-right corner. The reel gives way to the same picture on the room's screen, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.
+- **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.
+- **Wide screens only:** windows narrower than 6:5 (an upright phone, a narrow window) get a note to turn the phone sideways or widen the window, with "Read the program instead" for the plain program.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
 - **No WebGL:** `/` and `/program` show the program on its own, and a reel's address shows that reel on its own.
 - **Addresses:** `/program` opens the room with the program already picked up; it's the link for someone who wants the resume. Old `/#resume` links go there. A reel's address (`/experience`) opens the room with that reel already on the screen; the room fades in around it. Back and forward move between the room and the reels.
@@ -70,9 +72,9 @@ On the reels:
 
 - **Changing reels:** walk out the door at the edge of the scene, or press a door button at the bottom, which runs the character out that door. The film rolls to the next frame and the character walks in the other side. Pressing the button again cuts straight away.
 - **Addresses:** each reel has its own address, and the back button moves between reels. `/projects#speakeasy` opens that item's card.
-- **Content:** the panel at the top right (under the frame on narrow screens) lists the reel's items. Click one for its card, printed on the same cream paper as the program. Name colors mean the type: burnt orange for school, amber for work, avocado for projects.
-- **One look:** pixel art only inside the film. Everything around it (the panel, the door and sound buttons, the ×, the reel titles) uses the room's amber and cream and its fonts.
-- **A clean screen:** no key guide and no links to the program; visitors work the controls out. Sound is the speaker button in the frame's bottom-left corner, and the × in the page's top-right corner ends the film.
+- **On the screen:** the game plays as the screen's own picture in 3D, so the plant stays in front of it and the beam and dust cross it. Its interface is part of the picture: the hotbar, tooltips, the item panel at the top right, and the reel's title card. Clicks go through the screen into the game.
+- **Content:** click an item in the panel for its card, printed on the same cream paper as the program. Name colors mean the type: burnt orange for school, amber for work, avocado for projects.
+- **Around the screen:** the room's own controls, in its amber and cream: sound and the × in the top-right corner, and the door buttons under the screen's corners. No key guide; visitors work the controls out.
 - **Tuning:** the feel can only be tuned in development: press `` ` `` with `npm run dev` running.
-- **The film look:** grain, a soft vignette, and a faint flicker over the frame, like the room's projector.
+- **The film look:** the room's own grain and vignette fall on the screen with everything else.
 - **Reduced motion:** reels cut without the roll or the walk.
