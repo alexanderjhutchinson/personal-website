@@ -159,21 +159,33 @@ const ICONS: Record<IconKind, () => HTMLCanvasElement> = {
     }),
 };
 
+const canvases = new Map<IconKind, HTMLCanvasElement>();
+/** A content item's 16×16 pixel icon. */
+export function contentIcon(kind: IconKind) {
+  let c = canvases.get(kind);
+  if (!c) {
+    c = ICONS[kind]();
+    canvases.set(kind, c);
+  }
+  return c;
+}
+
 const urls = new Map<IconKind, string>();
 function iconUrl(kind: IconKind) {
   let url = urls.get(kind);
   if (!url) {
-    url = ICONS[kind]().toDataURL();
+    url = contentIcon(kind).toDataURL();
     urls.set(kind, url);
   }
   return url;
 }
 
 /**
- * The reel panels and item cards are rendered into the page by Astro. This
- * fills in their pixel icons and opens a card when an item is clicked.
+ * The item cards (and the reel's item list for screen readers) are rendered
+ * into the page by Astro. This fills in their pixel icons and opens a card
+ * when an item is clicked, here or in the panel drawn on the reel.
  */
-export function mountContent() {
+export function mountContent(onOpen?: (key: string) => void) {
   for (const el of document.querySelectorAll<HTMLElement>("[data-icon]")) {
     const kind = el.dataset.icon as IconKind;
     if (!(kind in ICONS) || el.querySelector("img")) continue;
@@ -184,7 +196,7 @@ export function mountContent() {
   }
 
   const dialog = document.getElementById("item-card") as HTMLDialogElement | null;
-  if (!dialog) return;
+  if (!dialog) return null;
   const cards = dialog.querySelectorAll<HTMLElement>("[data-card]");
 
   // Cards are keyed "reel/item". The open card's item goes in the address, like /projects#speakeasy.
@@ -192,6 +204,7 @@ export function mountContent() {
     for (const card of cards) card.hidden = card.dataset.card !== key;
     if (!dialog.open) dialog.showModal();
     history.replaceState(history.state, "", `#${key.split("/")[1]}`);
+    onOpen?.(key);
   };
 
   document.addEventListener("click", (e) => {
@@ -206,7 +219,9 @@ export function mountContent() {
     if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);
   });
 
-  const reel = document.getElementById("stage")?.dataset.reel;
+  const reel = document.getElementById("reel-layer")?.dataset.reel;
   const linked = `${reel}/${decodeURIComponent(location.hash.slice(1))}`;
   if (location.hash && [...cards].some((card) => card.dataset.card === linked)) open(linked);
+
+  return { open };
 }

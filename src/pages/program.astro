@@ -1,10 +1,9 @@
 ---
-import ProgramView from "../components/ProgramView.astro";
-import Stage from "../components/Stage.astro";
+import Room from "../components/Room.astro";
 import { person } from "../data/profile";
 import Base from "../layouts/Base.astro";
 
-// The same room, opened with the program already picked up: the link to send
+// The room, opened with the program already picked up: the link to send
 // someone who wants the resume.
 ---
 
@@ -12,11 +11,5 @@ import Base from "../layouts/Base.astro";
   title={`The program · ${person.name}`}
   description={`${person.name}: experience, projects, education, skills, and contact.`}
 >
-  <Stage open="program" />
-  <ProgramView />
+  <Room open="program" />
 </Base>
-
-<script>
-  import { boot } from "../scene/boot";
-  boot();
-</script>

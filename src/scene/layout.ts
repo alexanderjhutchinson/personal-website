@@ -1,4 +1,7 @@
 import { Vector3 } from "three";
+import { SCREEN_SIZE } from "./screen";
+
+export { IMAGE, REEL_VIEW, reelRect } from "./screen";
 
 // Room dimensions and where everything sits, in meters. The viewer sits on a
 // couch at the front of the room looking at the screen on the back wall.
@@ -12,16 +15,7 @@ export const ROOM = {
 
 export const SCREEN = {
   center: new Vector3(0, 1.6, -4.12),
-  width: 2.5,
-  height: 1.56,
-  /** Black masking border, as a fraction of the screen width. */
-  border: 0.035,
-};
-
-/** The projected picture: the screen minus its masking border. */
-export const IMAGE = {
-  width: SCREEN.width - 2 * SCREEN.border * SCREEN.width,
-  height: SCREEN.height - 2 * SCREEN.border * SCREEN.width,
+  ...SCREEN_SIZE,
 };
 
 export const COUCH = {

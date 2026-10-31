@@ -56,33 +56,9 @@ const { open } = Astro.props;
     background: #050302;
   }
 
-  :global(html[data-mode="room"]) .stage,
-  :global(html[data-mode="program"]) .stage,
-  :global(html[data-mode="playing"]) .stage,
-  :global(html[data-mode="entering"]) .stage,
-  :global(html[data-mode="ending"]) .stage {
+  /* The room is the whole site: it's up in every state except the page without it. */
+  :global(html[data-mode]:not([data-mode="flat"])) .stage {
     display: block;
-  }
-
-  :global(html[data-mode="entering"]) .stage {
-    animation: stage-out 0.5s ease forwards;
-    pointer-events: none;
-  }
-
-  :global(html[data-mode="ending"]) .stage {
-    animation: stage-in 0.45s ease both;
-  }
-
-  @keyframes stage-out {
-    to {
-      opacity: 0;
-    }
-  }
-
-  @keyframes stage-in {
-    from {
-      opacity: 0;
-    }
   }
 
   canvas {
@@ -110,6 +86,11 @@ const { open } = Astro.props;
 
   :global(html[data-loading]) .loading {
     opacity: 1;
+  }
+
+  /* A reel's address shows the reel straight away; the room fades in around it without a loading line. */
+  :global(html[data-mode="reel"]) .loading {
+    display: none;
   }
 
   .top-bar {
@@ -194,6 +175,13 @@ const { open } = Astro.props;
   :global(html[data-mode="playing"]) .top-bar .skip,
   :global(html[data-mode="ending"]) .top-bar .skip,
   :global(html[data-mode="program"]) .top-bar .skip {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* While a reel plays, its own sound button and × take over. */
+  :global(html[data-mode="entering"]) .top-bar,
+  :global(html[data-mode="reel"]) .top-bar {
     opacity: 0;
     pointer-events: none;
   }
