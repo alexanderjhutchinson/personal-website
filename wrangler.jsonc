@@ -18,5 +18,8 @@
   // With domains listed, Wrangler would turn these off. Keep the workers.dev
   // address and the per-branch preview links.
   "workers_dev": true,
-  "preview_urls": true
+  "preview_urls": true,
+  // Branch builds run `wrangler preview`, which stops without this block. Empty is
+  // enough: the site has no bindings or secrets that need a separate preview value.
+  "previews": {}
 }
