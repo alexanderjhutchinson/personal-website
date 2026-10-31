@@ -109,13 +109,14 @@ export class Overlay {
 
   /**
    * Draw onto a picture SCALE times the game's size. `fresh` means none of this reel's items have been
-   * opened yet: the panel then pulses and points itself out, like the program on the table.
+   * opened yet: the panel then pulses and points itself out, like the program on the table. `prompt`
+   * adds the "Click an item to read more" note, until the visitor has opened an item on any reel.
    */
-  draw(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean) {
+  draw(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean, prompt: boolean) {
     ctx.save();
     ctx.scale(SCALE, SCALE);
     ctx.textBaseline = "alphabetic";
-    this.drawPanel(ctx, reel, now, fresh);
+    this.drawPanel(ctx, reel, now, fresh, prompt);
     this.drawHotbar(ctx);
     this.drawTooltip(ctx);
     this.drawTitle(ctx, now);
@@ -194,7 +195,7 @@ export class Overlay {
   }
 
   /** The reel's items, in the room's style: a dark card with a double rule, a title-card heading, and the items. */
-  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean) {
+  private drawPanel(ctx: CanvasRenderingContext2D, reel: Reel, now: number, fresh: boolean, prompt: boolean) {
     const items = reelItems[reel.id];
     const textX = PANEL_X + PANEL_PAD + ENTRY_ICON + 5;
     const textW = PANEL_X + PANEL_W - PANEL_PAD - textX;
@@ -230,7 +231,7 @@ export class Overlay {
     ctx.strokeStyle = "rgba(224, 163, 58, 0.3)";
     ctx.strokeRect(PANEL_X + 1.8, top + 1.8, PANEL_W - 3.6, height - 3.6);
 
-    if (fresh) this.drawPrompt(ctx, top + height, since);
+    if (prompt) this.drawPrompt(ctx, top + height, since);
 
     ctx.fillStyle = AMBER;
     ctx.font = `500 4.3px ${MONO}`;

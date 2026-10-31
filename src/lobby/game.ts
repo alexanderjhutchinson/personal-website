@@ -527,7 +527,8 @@ export function startLobby(opts: LobbyOptions = {}): Lobby | null {
 
     pctx.imageSmoothingEnabled = false;
     pctx.drawImage(transition ? rollFilm(transition.t / ROLL_TIME, transition.dir) : buffer, 0, 0, picture.width, picture.height);
-    overlay.draw(pctx, here.reel, time, !readReels.has(here.reel.id));
+    // The note under the panel only needs to teach the click once, on whichever reel comes first.
+    overlay.draw(pctx, here.reel, time, !readReels.has(here.reel.id), readReels.size === 0);
   };
 
   /**
