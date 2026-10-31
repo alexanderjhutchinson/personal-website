@@ -45,6 +45,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/components/Reel.astro` | What sits around the reel: the door buttons, sound and × in the margins, the item cards, and the reel's items as a list for screen readers. Without the room, the reel's picture shows here on its own. |
 | `src/components/ProgramView.astro` | The program as a plain page: without the room, and from the "too narrow" note. |
 | `src/components/Program.astro` | The program in HTML, printed on cream paper. |
+| `src/layouts/Base.astro`, `public/og-image.jpg` | Every page's head, including the link preview: title, description, and the image of the room (1200×627) that LinkedIn, iMessage and Slack show when the site is shared. |
 | `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps). |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, window, screen. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |

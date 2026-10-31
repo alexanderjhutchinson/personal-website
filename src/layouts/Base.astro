@@ -10,6 +10,10 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+// Link previews (LinkedIn, iMessage, Slack) need full addresses, so these use the `site` in astro.config.
+// The build sees /about as /about/; the site serves it without the slash (see wrangler.jsonc).
+const url = new URL(Astro.url.pathname.replace(/(.)\/$/, "$1"), Astro.site);
+const image = new URL("/og-image.jpg", Astro.site);
 ---
 
 <!doctype html>
@@ -24,6 +28,13 @@ const { title, description } = Astro.props;
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <!-- The living room from the couch, rendered at the 1.91:1 shape link previews use. -->
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="627" />
+    <meta property="og:image:alt" content="A 1970s living room at night, lamps on, with a projector and a movie screen" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script is:inline>
       // Decide before first paint whether to show the 3D room or the program on its own ("flat").
