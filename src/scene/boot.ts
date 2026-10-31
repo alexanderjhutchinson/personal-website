@@ -176,7 +176,7 @@ export function boot() {
 
   /** End the film: the reel gives way to the same picture on the room's screen, and the camera pulls back. */
   const endFeature = (push = true) => {
-    if (!theater || theater.mode !== "reel" || !lobby) return;
+    if (!theater || (theater.mode !== "reel" && theater.mode !== "entering") || !lobby) return;
     lobby.setActive(false);
     if (push) history.pushState(null, "", "/");
     document.title = person.name;
@@ -292,7 +292,29 @@ export function boot() {
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
 
   // Keyboard. While a reel plays, the keys are the game's.
+  /**
+   * Escape always backs out of whatever is on top, one layer at a time: an item card (which closes
+   * itself), the plain program, the tuning panel, then the film (back to the couch), the opening
+   * (stopped), or the program in hand (put down).
+   */
+  const escape = () => {
+    if (document.querySelector("dialog[open]")) return;
+    const tuning = $("tuning");
+    if (root.hasAttribute("data-plain")) delete root.dataset.plain;
+    else if (tuning && !tuning.hidden) tuning.hidden = true;
+    else if (!theater) {
+      // Without the room, a reel's address is its own page: back out to the program.
+      if (openedOn && root.dataset.mode === "flat") location.assign("/");
+    } else if (theater.mode === "reel" || theater.mode === "entering") endFeature();
+    else if (theater.mode === "playing") theater.abort();
+    else if (theater.mode === "program") putDown();
+  };
+
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      escape();
+      return;
+    }
     if (!theater || e.metaKey || e.ctrlKey || e.altKey) return;
     const onControl = e.target instanceof Element && !!e.target.closest("button, a, input, textarea, select");
     const key = e.key.toLowerCase();
@@ -311,7 +333,7 @@ export function boot() {
         }
         break;
       case "program":
-        if (key === "escape" || key === "e") putDown();
+        if (key === "e") putDown();
         else if (key === "arrowleft" || key === "a") theater.turn(-1);
         else if (key === "arrowright" || key === "d") theater.turn(1);
         else return;

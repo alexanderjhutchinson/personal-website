@@ -518,9 +518,34 @@ export class Theater {
     window.setTimeout(() => this.finishEnter(), 450);
   }
 
+  /** Stop the opening partway: the projector winds down and the camera settles back on the couch, lights up. */
+  abort() {
+    if (this.mode !== "playing") return;
+    this.tl?.kill();
+    this.tl = null;
+    this.sound.stopMotor(0.5);
+    this.setMode("ending");
+    gsap.to(this.state, {
+      cam: 0,
+      beam: 0,
+      screen: 0,
+      running: 0,
+      reels: 0,
+      reel: 0,
+      lamp: 1,
+      ...IDLE_LOOK,
+      duration: this.quick(0.8),
+      ease: "power2.inOut",
+      onComplete: () => {
+        this.film.set("dark");
+        this.setMode("idle");
+      },
+    });
+  }
+
   /** Run the ending: the reel holds on its last frame, the film runs out, the camera pulls back, the lights come up. */
   end() {
-    if (this.mode !== "reel") return;
+    if (this.mode !== "reel" && this.mode !== "entering") return;
     const s = this.state;
     this.tl?.kill();
     Object.assign(s, { cam: 1, beam: 1, screen: 1, running: 1, reels: 1, reel: 1, ...FILM_LOOK, fade: 0 });
@@ -557,7 +582,8 @@ export class Theater {
   }
 
   private finishEnter() {
-    if (this.mode === "reel") return;
+    // Only from the fade-in: not if the film was ended or stopped meanwhile.
+    if (this.mode !== "entering") return;
     this.tl = null;
     this.sound.stopMotor(0.9);
     Object.assign(this.state, { running: 1, reels: 1, beam: 1, screen: 1, cam: 1, ...REEL_LOOK });

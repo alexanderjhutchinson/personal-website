@@ -62,6 +62,7 @@ Then open http://localhost:4321.
 - **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves up to it; the reel fades in on the screen: Reel 1 (`/about`), or the one picked in the program. The camera stops short, so the screen's border and the room stay around the reel, with the lamps at a low glow.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **Sound:** off until turned on. The choice is remembered.
+- **Escape** always backs out of whatever is on top, one layer at a time: an item card, then the plain program, then the film (back to the couch, like the ×). During the opening it stops the film; with the program in hand it puts it down.
 - **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.
 - **Wide screens only:** windows narrower than 6:5 (an upright phone, a narrow window) get a note to turn the phone sideways or widen the window, with "Read the program instead" for the plain program.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
