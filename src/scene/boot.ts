@@ -1,7 +1,6 @@
 import { REELS, type Reel } from "../data";
 import { person } from "../data/profile";
 import { startLobby } from "../lobby/game";
-import { reelRect } from "./screen";
 import type { RegionAction } from "./programPages";
 import type { Mode, Theater } from "./theater";
 
@@ -90,15 +89,6 @@ export function boot() {
   // The reels: the game draws one picture, which plays on the room's screen in 3D (or on its own, without the room).
   const lobby = startLobby({ onSound: setSound });
   const reelScreen = $("reel-screen");
-  // The room's controls sit in the margins around the screen's picture: tell them where it is.
-  const placeControls = () => {
-    const view = canvas.getBoundingClientRect();
-    const rect = reelRect(view.width, view.height);
-    root.style.setProperty("--reel-x", `${Math.round(rect.x)}px`);
-    root.style.setProperty("--below-reel", `${Math.round(view.height - rect.y - rect.h)}px`);
-  };
-  placeControls();
-  window.addEventListener("resize", placeControls);
 
   soundButton?.addEventListener("click", () => {
     setSound(!soundOn);

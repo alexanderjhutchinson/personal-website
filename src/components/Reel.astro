@@ -169,6 +169,12 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
       visibility 0s linear 0.2s;
   }
 
+  /* The layer lets the pointer through to the room's screen; what's on it takes the pointer back. */
+  .item-card,
+  .tuning {
+    pointer-events: auto;
+  }
+
   /* The room's controls: amber and cream mono, like the projector's buttons. */
   .control {
     pointer-events: auto;
@@ -227,18 +233,18 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     display: inline;
   }
 
-  /* Doors sit under the screen's corners, centered in the space below it. The page sets where the picture is. */
+  /* Doors sit in the window's bottom corners: the next reel bottom right, under the ×; the last one bottom left. */
   .door {
     position: fixed;
-    bottom: max(14px, calc(var(--below-reel, 72px) / 2 - 1.1rem));
+    bottom: max(14px, env(safe-area-inset-bottom, 0px));
   }
 
   .door.prev {
-    left: max(14px, var(--reel-x, 16px));
+    left: max(14px, env(safe-area-inset-left, 0px));
   }
 
   .door.next {
-    right: max(14px, var(--reel-x, 16px));
+    right: max(14px, env(safe-area-inset-right, 0px));
   }
 
   .noscript {
