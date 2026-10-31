@@ -123,6 +123,7 @@ export function boot() {
         t.sound.setEnabled(soundOn);
         if (lobby) t.setPicture(lobby.picture);
         theater = t;
+        coverRoom();
         delete root.dataset.loading;
         if (openedOn) t.enterReel(openedOn.id);
         else if (openProgram) pickUp();
@@ -279,14 +280,24 @@ export function boot() {
     endFeature();
   });
 
+  // While the plain program or the "too narrow" note covers the room, the room stops drawing.
+  const narrow = window.matchMedia("(max-aspect-ratio: 6/5)");
+  const coverRoom = () => theater?.hold(root.hasAttribute("data-plain") || narrow.matches);
+  narrow.addEventListener("change", coverRoom);
+
   // On a screen too narrow for the room, the program as a plain page.
+  const setPlain = (on: boolean) => {
+    if (on) root.dataset.plain = "";
+    else delete root.dataset.plain;
+    coverRoom();
+  };
   document.querySelectorAll("[data-plain]").forEach((b) =>
     b.addEventListener("click", () => {
-      root.dataset.plain = "";
+      setPlain(true);
       $("program-view")?.scrollTo(0, 0);
     }),
   );
-  document.querySelectorAll("[data-plain-close]").forEach((b) => b.addEventListener("click", () => delete root.dataset.plain));
+  document.querySelectorAll("[data-plain-close]").forEach((b) => b.addEventListener("click", () => setPlain(false)));
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
@@ -300,7 +311,7 @@ export function boot() {
   const escape = () => {
     if (document.querySelector("dialog[open]")) return;
     const tuning = $("tuning");
-    if (root.hasAttribute("data-plain")) delete root.dataset.plain;
+    if (root.hasAttribute("data-plain")) setPlain(false);
     else if (tuning && !tuning.hidden) tuning.hidden = true;
     else if (!theater) {
       // Without the room, a reel's address is its own page: back out to the program.

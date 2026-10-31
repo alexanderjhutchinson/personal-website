@@ -41,6 +41,7 @@ Then open http://localhost:4321.
 | `src/scene/beam.ts` | The projector beam and the dust in it and around the lamp. |
 | `src/scene/film.ts` | What's on the screen: leader, countdown, a still of a reel, the film running out, film damage. |
 | `src/scene/filmPass.ts` | Full-frame film look: grain, gate weave, flicker, vignette. |
+| `src/scene/scenePass.ts` | Draws the room anti-aliased into a buffer of its own, so the effects after it work on a plain copy. |
 | `src/scene/sound.ts` | Projector sounds, synthesized with Web Audio. |
 | `src/scene/textures.ts` | Every surface texture, painted on canvases at load time. |
 | `src/scene/layout.ts` | Room dimensions and where everything sits. |
@@ -66,6 +67,7 @@ Then open http://localhost:4321.
 - **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.
 - **Wide screens only:** windows narrower than 6:5 (an upright phone, a narrow window) get a note to turn the phone sideways or widen the window, with "Read the program instead" for the plain program.
 - **Reduced motion:** no camera move or flicker; the room cuts straight to the reel.
+- **Performance:** the room draws 60 frames a second while anything moves and 30 while it sits still, whatever the screen's refresh rate, and nothing while the plain program or the "too narrow" note covers it. A machine that can't keep up steps down on its own: no anti-aliasing, then fewer pixels, then no bloom.
 - **No WebGL:** `/` and `/program` show the program on its own, and a reel's address shows that reel on its own.
 - **Addresses:** `/program` opens the room with the program already picked up; it's the link for someone who wants the resume. Old `/#resume` links go there. A reel's address (`/experience`) opens the room with that reel already on the screen; the room fades in around it. Back and forward move between the room and the reels.
 

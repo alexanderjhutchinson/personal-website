@@ -7,7 +7,8 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 - **Phase 1 (the living room) is built** and merged into `main` (#1).
 - **Phase 2 has its frame:** three reels at `/about`, `/experience` and `/projects`, with doors, the frame roll, and the June 2026 content as items. Merged into `main` (#2).
 - **The room, the program and the feature are tied together** (merged in #3): the resume is a folded program on the coffee table, and the opening runs straight into Reel 1.
-- **One room** on branch `one-room` (see "One room" below): the reels play on the room's screen instead of on pages of their own.
+- **One room** (merged in #4, see "One room" below): the reels play on the room's screen instead of on pages of their own.
+- **Performance** on branch `performance` (see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Nothing is deployed yet.**
 - **Next:** see "Phase 2: next up".
@@ -152,7 +153,7 @@ Checked in the browser at 16:9, square and phone sizes: the prompt, pick up, all
 
 The critique after #3: the landing page and the feature still didn't feel like one thing. The room was a realistic 3D living room; the reels were a pixel game on a dark page of their own, with purple game menus. You left the room to see the feature.
 
-### Status: built (branch `one-room`)
+### Status: built (merged in #4)
 
 - **The site never leaves the room.** The reels play on the pull-down screen. After the opening the camera stops square-on to the screen with the picture filling about three quarters of the view, so the screen's black border, the paneling, the plant and the radio stay around it. The lamps come back up to a low glow once the reel is on, like house lights at half.
 - **The game plays as the screen's own picture, in 3D.** The game draws one picture (the scene, with its interface drawn on top at three times the game's resolution so text stays sharp), and the room shows it on the screen every frame. So the plant stands in front of it, the projector beam and the dust cross it, the room's grain falls on it, and it's exactly the screen's shape. (A first try laid the game over the page on top of the 3D room; it cut through the plant, the beam and the dust and never quite lined up, so it was dropped.)
@@ -171,7 +172,27 @@ Open:
 
 - **Phones held sideways:** it works, but the picture is small (about 480 pixels wide), so the item panel's and hotbar's text is too small to read. Options: draw the interface bigger on small screens, or move the item list into the room's side margins there.
 - A pass on the pixel palette toward the room's 70s colors (mustard, burnt orange, avocado, teak).
-- The room renders at full speed while a reel plays (the screen's picture changes every frame); worth checking on a slower laptop.
+- How hard the room works the machine: see "Performance".
+
+## Performance
+
+The question: does the site make visitors' machines lag or run hot? Measured on an M4 Pro MacBook (120 Hz Retina screen, a 1440×900 window): yes, it did. The room drew a new frame every time the screen refreshed, 120 times a second, in every state, and each frame took about 8 ms of GPU time. macOS reported the GPU at 95 to 100% busy with the room just sitting on the couch, and a reel couldn't hold 120 frames a second at all. Most laptops have far weaker graphics than this one.
+
+Where the time went, per frame: 4× anti-aliasing about 5 ms (every post-processing pass wrote to multisampled buffers, not just the scene), bloom about 2.8 ms, the film grain pass about 1.9 ms. The dust, the beam, the triangle count (about 13,000) and uploading the reel's picture each frame were all small.
+
+### Status: built (branch `performance`)
+
+- **Only the scene is anti-aliased.** It draws into a multisampled buffer of its own (`src/scene/scenePass.ts`), and bloom, color and film work on a plain copy. Same look; a frame went from 8.1 ms to 4.8 ms.
+- **The frame rate follows what's on screen:** 60 frames a second while anything moves (a sequence, the program being picked up or turned, the pointer moving, a reel playing), 30 while the room sits still on the couch or with the program held still. However fast the screen refreshes.
+- **Nothing is drawn while the room is covered**: by the plain program, or by the "too narrow" note.
+- **Slow machines step down on their own.** If frames keep coming in well behind (the median over 45 frames is more than 1.4 times late), the room drops anti-aliasing, then draws at one pixel per screen pixel, then drops bloom, about 2 seconds apart. The dust's point size now follows the room's actual drawing resolution.
+
+After, on the same Mac: the GPU is about 31 to 41% busy on the couch (was 95 to 100%) and 40 to 48% during a reel (was about 100%), and both numbers include the 0 to 17% the rest of the desktop uses. Reels hold a steady 60 frames a second. Checked: the opening, picking up and turning the program, a reel, the "too narrow" note and the plain program (drawing stops and resumes), and a simulated slow machine (each step down, and the lowest step still renders correctly). The fast machine was never stepped down.
+
+Open:
+
+- Not measured on an actual slow laptop or phone; the step-down was tested by slowing frames on purpose.
+- The reels' game still draws its picture on every screen refresh (about 1 ms of CPU each), though the room only shows it 60 times a second.
 
 ## Phase 2: the world and how info is communicated
 
