@@ -11,7 +11,7 @@ A from-scratch rebuild of my personal site. It replaces the old React/Vite site 
 - **Performance** (merged in #5, see "Performance" below): the room no longer keeps the GPU busy the whole time the page is open.
 - **Everything else is on `main`** in `alexanderjhutchinson/personal-website`. New work goes on a branch off `main`, with its own pull request.
 - **Deployed** (#6 to #8): Cloudflare Workers serves the site at alexanderjhutchinson.com, and every push to `main` deploys it.
-- **Room extras** (see "Room extras" below): the lamps switch off and on. Next: the pin board, then a radio, magazines and film cans.
+- **Room extras** (see "Room extras" below): the lamps switch off and on, and the radio plays one station. Next: the pin board, then magazines and film cans.
 
 ## Why it matters
 
@@ -198,7 +198,7 @@ Open:
 
 The program and the reels cover the resume. What's left is the room itself: things a curious visitor can find and play with, holding the personal stuff that isn't in the feature. None of it is needed to see the resume.
 
-### Status: lamps built, the rest are ideas
+### Status: lamps and radio built, the rest are ideas
 
 Each object gets one job, so visitors know where to look and nothing ends up in two places:
 
@@ -219,15 +219,15 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 
 **Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp.
 
-**Radio.** Live radio, tuned with a dial, with crackle between stations synthesized in code like the projector sounds.
+**Radio (built).** One station, playing an old 78 in the spirit of Don't Starve's scratchy gramophone jazz: "Tiger Rag" by the Original Dixieland Jass Band (1918). Click the radio on the sideboard to switch it on and off, with a chunky knob click. It warms up with a burst of static, then the record fades in where it left off, and the dial glows while it plays.
 
-- It plays each station's public stream. The stream has to be https, or the browser blocks it on an https site.
-- Stations go down or move their stream: fall back to static.
-- An old-radio tone filter only works when the station's server allows other sites to process its audio. Otherwise the station plays unfiltered.
-- The stream is the station's, not mine. Only use stations that publish their stream publicly, and check their terms.
-- Plan: 3 or 4 live stations I like, plus a station of my own playing royalty-free tracks, with the credits shown.
-- Turning the radio on turns the site's sound on.
-- Later: "now playing" from Spotify or Last.fm (see "Later: live data") could show on the dial.
+- The recording is in the public domain: in the US, recordings published in 1925 or earlier are. The file is from Wikimedia Commons (`File:Tiger_Rag_ODJB.ogg`), saved as a 2.1 MB mono MP3 in `public/radio/`. The record brings its own crackle.
+- It plays through a small-speaker filter (no deep bass or bright treble), a little to the right, where the radio sits.
+- The file loads only the first time the radio is switched on, so the room opens as fast as before.
+- Switching the radio on turns the site's sound on. Turning sound off switches the radio off, and turning sound back on leaves it off.
+- The film turns it down to a murmur, and it comes back up after.
+- Live stations were the first plan and are dropped: streams go down or move, the tone filter needs the station's permission, and their terms vary.
+- Later: more public-domain 78s on the same station, or "now playing" from Spotify or Last.fm (see "Later: live data") on the dial.
 
 **Magazines.** A stack on the coffee table or the sideboard. Picking one up works like the program: hold it up, turn the pages, Escape puts it down. One issue per interest, each with an original 70s-style cover and title (no copies of real magazines).
 
@@ -252,11 +252,11 @@ Build order:
 1. A small setup so each clickable object in the room is one entry: where it is, how it highlights, what a click does. Built: the fixtures in `theater.ts`.
 2. Lamps. Built.
 3. Pin board.
-4. Radio.
+4. Radio. Built.
 5. Magazines.
 6. Film cans, once their content is picked.
 
-Needed from me: the decorations (each object, where it sits, and what it does when clicked, if anything), photos for the board, the radio stations, magazine topics, and what goes on the film cans.
+Needed from me: the decorations (each object, where it sits, and what it does when clicked, if anything), photos for the board, magazine topics, and what goes on the film cans.
 
 ## Phase 2: the world and how info is communicated
 
@@ -371,7 +371,7 @@ Each of these has a natural home in the scene. They need a small server piece to
 
 - **Time of day:** computed in the browser from Waterloo time, no API needed. Drives lighting (window light, lamps on at night). Shows my time, not the visitor's.
 - **Weather:** Open-Meteo (free, no key). Rain or snow on the window, storm flashes.
-- **Radio / now playing:** Spotify or Last.fm. Can show the song and link to it, but can't play my music to visitors. Any site music has to be original or licensed. The radio itself (live stations and a royalty-free station of my own) is planned in "Room extras".
+- **Radio / now playing:** Spotify or Last.fm. Can show the song and link to it, but can't play my music to visitors. Any site music has to be original or licensed. The radio itself plays one public-domain record (see "Room extras").
 - **Ticker or marquee:** one strip showing all of it, for example "Now playing: … · −4°C, light snow in Waterloo · 11:42 pm".
 - **Others:** GitHub activity, osu! stats, current Steam game.
 - **Location:** city-level and set by me, never GPS. Switch it during a co-op term elsewhere.
@@ -385,7 +385,7 @@ Decided for phase 1:
 - **Astro + TypeScript.** The site is static by default; the 3D scene loads only on the page that uses it.
 - **three.js** for the room, written directly (no React layer). Effects use three's post-processing: bloom, plus a custom film shader.
 - **GSAP** timelines for the opening, skip, and ending sequences.
-- **Web Audio** for sound, synthesized in code. No audio files.
+- **Web Audio** for sound, synthesized in code. The one audio file is the radio's record, a public-domain 78.
 - **Self-hosted fonts** via Fontsource: Fraunces (display), Instrument Sans (body), IBM Plex Mono (labels).
 - **No image files.** Every texture is painted on a canvas at load time.
 

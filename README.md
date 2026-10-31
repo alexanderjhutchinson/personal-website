@@ -46,8 +46,8 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/components/ProgramView.astro` | The program as a plain page: without the room, and from the "too narrow" note. |
 | `src/components/Program.astro` | The program in HTML, printed on cream paper. |
 | `src/layouts/Base.astro`, `public/og-image.jpg` | Every page's head, including the link preview: title, description, and the image of the room (1200×627) that LinkedIn, iMessage and Slack show when the site is shared. |
-| `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps). |
-| `src/scene/room.ts` | The room: walls, furniture, lamps, window, screen. |
+| `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps and the radio). |
+| `src/scene/room.ts` | The room: walls, furniture, lamps, radio, window, screen. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
 | `src/scene/program.ts` | The program on the coffee table: a folded sheet that opens and turns over. |
 | `src/scene/programPages.ts` | Paints the program's four pages, and where the reels and links on them are. |
@@ -55,7 +55,8 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/scene/film.ts` | What's on the screen: leader, countdown, a still of a reel, the film running out, film damage. |
 | `src/scene/filmPass.ts` | Full-frame film look: grain, gate weave, flicker, vignette. |
 | `src/scene/scenePass.ts` | Draws the room anti-aliased into a buffer of its own, so the effects after it work on a plain copy. |
-| `src/scene/sound.ts` | The room's sounds (projector, paper, lamp switches), synthesized with Web Audio. |
+| `src/scene/sound.ts` | The room's sounds (projector, paper, lamp switches, the radio's knob), synthesized with Web Audio. |
+| `src/scene/radio.ts`, `public/radio/tiger-rag.mp3` | The radio's one station: a public-domain 78 played through a small-speaker filter, with a burst of static as it warms up. The site's only audio file, loaded the first time the radio is switched on. |
 | `src/scene/textures.ts` | Every surface texture, painted on canvases at load time. |
 | `src/scene/layout.ts` | Room dimensions and where everything sits. |
 | `src/scene/screen.ts` | The screen's size, and where its picture sits on the page while a reel plays (no three.js, so the page can lay out the controls before the room loads). |
@@ -76,6 +77,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 - **The film:** clicking the projector, Enter, or picking a reel in the program starts it. There's no start button on screen. After the countdown the screen goes back to bare projector light and the camera moves up to it; the reel fades in on the screen: Reel 1 (`/about`), or the one picked in the program. The camera stops short, so the screen's border and the room stay around the reel, with the lamps at a low glow.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **The lamps:** click the table lamp or the pole lamp to switch it off and on. Nothing points them out: the cursor changes and the lamp brightens a little under the pointer. With both off, the room is lit by the moon through the window. The film dims the lamps as before but leaves their switches alone, so a lamp switched off stays off after the film.
+- **The radio:** click the radio on the sideboard to switch it on and off. One station, playing "Tiger Rag" by the Original Dixieland Jass Band (1918), a public-domain recording from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tiger_Rag_ODJB.ogg). Switching it on turns the site's sound on; turning sound off switches it off. The film turns it down, and it comes back up after.
 - **Sound:** off until turned on. The choice is remembered.
 - **Escape** always backs out of whatever is on top, one layer at a time: an item card, then the plain program, then the film (back to the couch, like the ×). During the opening it stops the film; with the program in hand it puts it down.
 - **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.

@@ -26,6 +26,14 @@ export interface Room {
     /** The outside of its two shades, which brightens under the pointer. */
     shades: THREE.MeshStandardMaterial;
   };
+  /** The radio on the sideboard. */
+  radio: {
+    hitTargets: THREE.Object3D[];
+    /** The wooden case and the grille cloth on its front, which brighten under the pointer. */
+    body: THREE.MeshStandardMaterial[];
+    /** The tuning dial, lit while it plays. */
+    dial: THREE.MeshStandardMaterial;
+  };
   fill: THREE.HemisphereLight;
   moon: THREE.DirectionalLight;
   windowGlass: THREE.MeshBasicMaterial;
@@ -256,17 +264,32 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
 
   // Radio on the sideboard.
   const radio = new THREE.Group();
-  radio.add(new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.24, 0.17, 3, 0.03), wood("#7b4c2a", 0.45)));
-  const grille = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.24, 0.16),
-    new THREE.MeshStandardMaterial({ map: tex.grilleCloth(), roughness: 1 }),
-  );
+  const radioWood = wood("#7b4c2a", 0.45);
+  radioWood.emissive.set("#7b4c2a");
+  radioWood.emissiveIntensity = 0;
+  radio.add(new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.24, 0.17, 3, 0.03), radioWood));
+  // The cloth glows in its own colors, like the wood.
+  const cloth = tex.grilleCloth();
+  const clothMat = new THREE.MeshStandardMaterial({
+    map: cloth,
+    emissive: "#ffffff",
+    emissiveMap: cloth,
+    emissiveIntensity: 0,
+    roughness: 1,
+  });
+  const grille = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.16), clothMat);
   grille.position.set(-0.07, 0, 0.0855);
-  const dial = new THREE.Mesh(
-    new THREE.CircleGeometry(0.045, 32),
-    new THREE.MeshStandardMaterial({ color: palette.cream, roughness: 0.6 }),
-  );
+  const dialMat = new THREE.MeshStandardMaterial({
+    color: palette.cream,
+    emissive: new THREE.Color(palette.lampLight),
+    emissiveIntensity: 0,
+    roughness: 0.6,
+  });
+  const dial = new THREE.Mesh(new THREE.CircleGeometry(0.045, 32), dialMat);
   dial.position.set(0.13, 0.02, 0.0855);
+  const needle = box(0.003, 0.07, 0.001, new THREE.MeshStandardMaterial({ color: "#3a2416" }), 0.13, 0.02, 0.0865);
+  needle.rotation.z = -0.35;
+  radio.add(needle);
   const knobA = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.02, 16), brass);
   knobA.rotation.x = Math.PI / 2;
   knobA.position.set(0.1, -0.07, 0.09);
@@ -546,6 +569,7 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
       base: baseMat,
     },
     accent: { light: accentLight, glow: coneGlow, hitTargets: [pole], shades: coneOuter },
+    radio: { hitTargets: [radio], body: [radioWood, clothMat], dial: dialMat },
     fill,
     moon,
     windowGlass,

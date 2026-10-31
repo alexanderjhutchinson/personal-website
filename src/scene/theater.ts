@@ -87,6 +87,8 @@ interface SceneState {
   /** Each lamp's own switch, 1 on and 0 off. The visitor flips these; the film leaves them be. */
   tableLamp: number;
   poleLamp: number;
+  /** The radio's dial light: 0 off, 1 lit. */
+  radio: number;
   running: number;
   reels: number;
   beam: number;
@@ -147,6 +149,8 @@ export interface TheaterOptions {
   seenIntro: () => boolean;
   onMode: (mode: Mode) => void;
   onHover: (target: HoverTarget) => void;
+  /** The visitor switched the radio on or off. It only plays with sound on, so switching it on should turn sound on. */
+  onRadio?: (on: boolean) => void;
   /** The held program turned to another view; first and last say whether it can turn further. */
   onProgramPage: (name: string, first: boolean, last: boolean) => void;
   /** Called after every rendered frame. */
@@ -183,6 +187,7 @@ export class Theater {
     lamp: 1,
     tableLamp: 1,
     poleLamp: 1,
+    radio: 0,
     running: 0,
     reels: 0,
     beam: 0,
@@ -220,6 +225,7 @@ export class Theater {
   private fixture: Fixture | null = null;
   /** Which way each lamp's switch was last flipped (its light may still be fading). */
   private lampsOn = { tableLamp: true, poleLamp: true };
+  private radioOn = false;
   /** The fill light's own colors, with the lamps on. */
   private warmFill!: { sky: THREE.Color; ground: THREE.Color };
   private pointer = new THREE.Vector2(0, 0);
@@ -262,11 +268,22 @@ export class Theater {
     this.film = new Film();
     this.room = buildRoom(this.film.texture);
     scene.add(this.room.group);
-    const { lamp, accent, fill } = this.room;
+    const { lamp, accent, fill, radio } = this.room;
     this.warmFill = { sky: fill.color.clone(), ground: fill.groundColor.clone() };
     this.fixtures = [
       this.lampSwitch("tableLamp", lamp.hitTargets, (level) => (lamp.base.emissiveIntensity = level * 0.18)),
       this.lampSwitch("poleLamp", accent.hitTargets, (level) => (accent.shades.emissiveIntensity = level * 0.25)),
+      {
+        targets: radio.hitTargets,
+        highlight: (level) => radio.body.forEach((m) => (m.emissiveIntensity = level * 0.22)),
+        hover: 0,
+        click: () => {
+          const on = !this.radioOn;
+          this.opts.onRadio?.(on);
+          this.sound.knob();
+          this.setRadio(on);
+        },
+      },
     ];
 
     this.projector = buildProjector(PROJECTOR.position, SCREEN.center);
@@ -385,6 +402,14 @@ export class Theater {
       }
     }
     return nearest;
+  }
+
+  /** Switch the radio on or off: its record plays (radio.ts) and its dial lights up. */
+  setRadio(on: boolean) {
+    if (on === this.radioOn) return;
+    this.radioOn = on;
+    this.sound.setRadio(on);
+    gsap.to(this.state, { radio: on ? 1 : 0, duration: on ? 0.9 : 0.3, ease: "power1.out", overwrite: "auto" });
   }
 
   /** A lamp that clicks off and on. Its light, and the room's, follow its switch. */
@@ -697,6 +722,8 @@ export class Theater {
 
   private setMode(mode: Mode) {
     this.mode = mode;
+    // The radio turns down while the film runs.
+    this.sound.duckRadio(mode !== "idle" && mode !== "program");
     this.opts.onMode(mode);
   }
 
@@ -897,6 +924,7 @@ export class Theater {
       f.hover += ((this.fixture === f ? 1 : 0) - f.hover) * ease;
       f.highlight(f.hover);
     }
+    this.room.radio.dial.emissiveIntensity = 0.85 * s.radio;
     // Reduced motion freezes the drifting dust and smoke in place.
     const drift = this.opts.reducedMotion ? 0 : this.time;
     this.roomDust.update(drift, table);
