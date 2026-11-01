@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { COFFEE_TABLE, LAMP, ROOM, SCREEN, WINDOW } from "./layout";
+import { CHAIR, COFFEE_TABLE, LAMP, ROOM, SCREEN, SOFA, WINDOW } from "./layout";
 import { palette } from "./palette";
 import { rng } from "./random";
+import { loungeChair, loveseat } from "./seating";
 import * as tex from "./textures";
 
 export interface Room {
@@ -483,6 +484,23 @@ export function buildRoom(filmTexture: THREE.Texture): Room {
   }
   coffee.position.set(COFFEE_TABLE.center.x, 0, COFFEE_TABLE.center.z);
   group.add(shadowed(coffee));
+
+  // A loveseat beside the coffee table, and a lounge chair in the pole lamp's corner.
+  const sofa = loveseat();
+  sofa.position.copy(SOFA.position);
+  sofa.rotation.y = SOFA.yaw;
+  const chair = loungeChair(teak);
+  chair.position.copy(CHAIR.position);
+  chair.rotation.y = CHAIR.yaw;
+  group.add(shadowed(sofa), shadowed(chair));
+  // The pole lamp casts no shadows, so a soft one under the chair sets it down on the floor.
+  const underChair = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.1, 1.15),
+    new THREE.MeshBasicMaterial({ map: tex.softShadow(), color: "#000000", transparent: true, depthWrite: false }),
+  );
+  underChair.rotation.x = -Math.PI / 2;
+  underChair.position.y = 0.003;
+  chair.add(underChair);
 
   // Film cans: the reels foreshadow how phase 2 navigates.
   const canSide = new THREE.MeshStandardMaterial({ color: "#8f8a80", metalness: 0.75, roughness: 0.35 });

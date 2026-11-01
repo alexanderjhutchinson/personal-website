@@ -51,7 +51,7 @@ Decided: a 3D room drawn entirely in code, set in the 1970s, ending on a stopgap
 
 What's in it:
 
-- The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, and film cans labeled Experience, Projects and Photos.
+- The room: wood paneling, wallpaper, shag rug, teak sideboard, table lamp, tension pole lamp, window with moonlight, pull-down screen, placeholder posters, a radio, a snake plant, popcorn, film cans labeled Experience, Projects and Photos, a green loveseat and a mustard lounge chair.
 - A Super 8 projector on the coffee table. Click it (or press Enter) to start the film. The on-screen "Start the film" button was dropped.
 - The full opening (about 4.2 seconds): lamps dim, reels spin up, the beam appears through dust, the screen flickers, a 3-2-1 countdown with the 2-pop, then the screen goes back to bare projector light and the camera moves into it. No text cards and no preview: the reel is a surprise until it loads.
 - A short opening for return visits (about 1.8 seconds).
@@ -210,7 +210,7 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 | Film cans | Things better played in order: trips, things I'm building |
 | Radio | Sound |
 | Lamps | Light |
-| Decorations | Mine to design, after ideating |
+| Decorations | Making the room look lived in (started) |
 
 **Pin board (built).** On the back wall, right of the screen and above the radio, where the pole lamp lights it: cork in a walnut frame, with snapshots on colored pushpins and a ticket stub from the Late Show. From the couch the whole board is one thing: it brightens under the pointer, and a click turns the camera to face it, filling most of the view. There each photo brightens under the pointer, and a click takes it off its pin (the pin stays in the cork) and up to the camera, the way the program is picked up, with "3 / 7" in a bar below. No captions: the photos speak for themselves. The arrows, the bar's buttons, or a click on either half of the photo go to the next or previous one, round and round: the one in hand goes back as the next comes off. Escape, a click off the photo, or "Pin it back" puts it back, and the camera stays at the board. Escape again, a click off the board, or "Back to the couch" goes back to the couch. A soft pushpin click goes with each photo. Bloom drops most of the way at the board, since the pole lamp is close enough to make the prints glow.
 
@@ -231,6 +231,37 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 - The film turns it down to a murmur, and it comes back up after.
 - Live stations were the first plan and are dropped: streams go down or move, the tone filter needs the station's permission, and their terms vary.
 - Later: more public-domain 78s on the same station, or "now playing" from Spotify or Last.fm (see "Later: live data") on the dial.
+
+**Decorations (started).** Not clickable: they're there to make the room look lived in. The room was all one orange-brown, a little sparse, and had nowhere to sit. The direction:
+- **Colour:** more than one hue, kept to a tight palette with a complementary accent, as in Firewatch.
+- **Fill every height:** things on the floor, at seat height, at eye level, high up and on the ceiling.
+- **Objects that say something about me,** the way Gone Home, What Remains of Edith Finch and Unpacking tell a life through a room.
+- **References:**
+  - Kentucky Route Zero, for staged lighting.
+  - The basements in That '70s Show and Stranger Things.
+  - William Eggleston's and Stephen Shore's 1970s colour photos.
+  - Old Sears catalogues.
+
+- **A loveseat in green tweed against the left wall:**
+  - The lamp table is at its far end, so the lamp lights it.
+  - It has a mustard pillow, which answers the chair across the room.
+  - From the couch the view cuts it off at the left. On a phone held sideways all of it shows, under the Double Feature poster.
+  - It was first tried in the front left of the view, to frame the shot, but there it was a dark shape and hid the lamp's pool of light.
+- **A Danish-style lounge chair in the pole lamp's corner, under the pin board:**
+  - It has a teak frame with its back leaning out, and mustard cushions, and it's turned toward the couch.
+  - The pole lamp casts no shadows, so a soft dark patch on the floor sets the chair down.
+- **How they're made** (`src/scene/seating.ts`):
+  - Both are built from rounded boxes, covered in a painted tweed with a soft sheen where light grazes it.
+  - Together they're about 3,500 triangles, which brings the room to about 17,000.
+  - They cost about 0.4 ms of GPU time a frame at 1600×900 on the M4 Pro (pixel ratio 2), about 0.3 ms of it the sheen. Without the sheen the fabric looks flat.
+- **Still to do, from the ideating:**
+  - shelves for the magazines, records and film cans
+  - a patterned rug and floor cushions
+  - moonlight on the floor under the window
+  - ceiling beams or a swag lamp
+  - a sunburst clock or a hanging planter
+  - a receiver with a glowing dial, and a trailing plant on the sideboard
+  - wear: uneven boards, scuffs, a worn path in the carpet
 
 **Magazines.** A stack on the coffee table or the sideboard. Picking one up works like the program: hold it up, turn the pages, Escape puts it down. One issue per interest, each with an original 70s-style cover and title (no copies of real magazines).
 

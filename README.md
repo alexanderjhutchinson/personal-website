@@ -50,6 +50,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/layouts/Base.astro`, `public/og-image.jpg` | Every page's head, including the link preview: title, description, and the image of the room (1200×627) that LinkedIn, iMessage and Slack show when the site is shared. |
 | `src/scene/theater.ts` | The 3D controller: renderer, camera framing, the opening, skip, and ending sequences (GSAP timelines), and the room's fixtures (things a click from the couch does something to, like the lamps, the radio and the pin board), the walk over to the pin board, and holding up the program or a photo. |
 | `src/scene/room.ts` | The room: walls, furniture, lamps, radio, window, screen. |
+| `src/scene/seating.ts` | The loveseat and the lounge chair, upholstered in a painted tweed. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
 | `src/scene/program.ts` | The program on the coffee table: a folded sheet that opens and turns over. |
 | `src/scene/board.ts`, `public/photos/`, `scripts/photos.mjs` | The pin board beside the screen: cork in a walnut frame, photos on pushpins, and a ticket stub. Each photo has a small copy, loaded with the room, and a large one, loaded when it's held up. The script makes them from the originals. |

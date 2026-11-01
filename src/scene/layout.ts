@@ -32,6 +32,12 @@ export const PROGRAM = { position: new Vector3(0.14, COFFEE_TABLE.top, 0.33), ya
 
 export const LAMP = { table: new Vector3(-2.45, 0, -3.25) };
 
+/** A loveseat against the left wall with the side table at its far end, so the lamp lights it. From the couch the view cuts it off at the left. */
+export const SOFA = { position: new Vector3(-2.68, 0, -2.0), yaw: Math.PI / 2 };
+
+/** A lounge chair in the far right corner, under the pole lamp, turned toward the couch. */
+export const CHAIR = { position: new Vector3(2.35, 0, -3.35), yaw: -0.6 };
+
 /** The pin board on the back wall, right of the screen and above the radio, where the pole lamp lights it. */
 export const BOARD = { center: new Vector3(1.98, 1.6, ROOM.back), width: 1.1, height: 0.75 };
 

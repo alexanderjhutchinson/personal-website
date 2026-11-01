@@ -426,6 +426,51 @@ export function cork(repeat: [number, number]) {
   return texture(c, { repeat });
 }
 
+/**
+ * Nubby woven upholstery, the tweedy kind 1970s sofas came in: a basket weave in shades of the
+ * base color, with flecks of lighter and darker thread. Meant for box-projected UVs (see seating.ts).
+ */
+export function upholstery(base: string, seed: number) {
+  const S = 256;
+  const cell = 8;
+  const r = rng(seed);
+  const { c, ctx } = canvas(S, S);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, S, S);
+  for (let y = 0; y < S; y += cell) {
+    for (let x = 0; x < S; x += cell) {
+      const across = (x + y) % (cell * 2) === 0;
+      for (let k = 0; k < cell; k += 2) {
+        ctx.fillStyle = jitter(base, 0.12, r);
+        if (across) ctx.fillRect(x, y + k, cell, 1.5);
+        else ctx.fillRect(x + k, y, 1.5, cell);
+      }
+    }
+  }
+  for (let i = 0; i < 1600; i++) {
+    ctx.fillStyle = jitter(base, 0.35, r);
+    ctx.globalAlpha = 0.3 + r() * 0.45;
+    ctx.fillRect(r() * S, r() * S, 1 + r() * 3, 1 + r() * 1.2);
+  }
+  ctx.globalAlpha = 1;
+  return texture(c);
+}
+
+/** A soft dark pool, laid on the floor under furniture where no lamp casts its shadow. */
+export function softShadow() {
+  const S = 128;
+  const { c, ctx } = canvas(S, S);
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, "rgba(0, 0, 0, 0.6)");
+  g.addColorStop(0.5, "rgba(0, 0, 0, 0.4)");
+  g.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  const t = texture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 /** A cinema ticket stub, pinned to the board. */
 export function ticket() {
   const W = 256;
