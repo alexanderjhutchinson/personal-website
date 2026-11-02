@@ -2,7 +2,7 @@ import { REELS, type Reel } from "../data";
 import { person } from "../data/profile";
 import { startLobby } from "../lobby/game";
 import type { RegionAction } from "./programPages";
-import type { Mode, Theater } from "./theater";
+import type { Hint, Mode, Theater } from "./theater";
 
 // Connects the 3D room to the page: buttons, keyboard, sound preference,
 // first-visit tracking, the program (picked up and turned), the pin board
@@ -13,6 +13,12 @@ import type { Mode, Theater } from "./theater";
 const SEEN_KEY = "movie-night:seen-intro";
 const SOUND_KEY = "movie-night:sound";
 const PROGRAM_KEY = "movie-night:read-program";
+const TRIED_KEY = "movie-night:tried";
+
+/** How long the room waits on the couch, with nothing new found, before the hint starts. */
+const HINT_DELAY_MS = 5000;
+/** What the hint points out, first to last: it blinks the first of these not yet tried. */
+const HINTS: Hint[] = ["projector", "board", "radio"];
 
 function read(key: string) {
   try {
@@ -134,6 +140,7 @@ export function boot() {
           onPhoto: (says) => {
             if (photoSays) photoSays.textContent = says;
           },
+          onUse: (thing) => use(thing),
           onFrame: () => placePrompt(),
         });
         await t.init();
@@ -147,6 +154,7 @@ export function boot() {
         else if (openProgram) pickUp();
         // Give the room a moment to fade in before pointing at the program.
         else window.setTimeout(updatePrompt, reducedMotion ? 0 : 1200);
+        hintLater();
         return t;
       })
       .catch((err) => {
@@ -169,6 +177,27 @@ export function boot() {
     }
     if (mode === "reel" && lobby) theater?.showReel(lobby.reel);
     updatePrompt();
+    hintLater();
+  };
+
+  // The hint: after a few seconds on the couch without finding anything new, the first thing not yet
+  // tried blinks until it's used: the film, then the photos, then the radio. What's been used is
+  // remembered across visits, and finding something new starts the wait again. Moving the pointer
+  // doesn't: that's someone looking.
+  const tried = new Set((read(TRIED_KEY) ?? "").split(",").filter(Boolean));
+  let hintTimer = 0;
+  const hintLater = () => {
+    window.clearTimeout(hintTimer);
+    theater?.setHint(null);
+    hintTimer = window.setTimeout(() => {
+      if (theater?.mode === "idle") theater.setHint(HINTS.find((h) => !tried.has(h)) ?? null);
+    }, HINT_DELAY_MS);
+  };
+  const use = (thing: Hint) => {
+    if (tried.has(thing)) return;
+    tried.add(thing);
+    write(TRIED_KEY, [...tried].join(","));
+    hintLater();
   };
 
   // The program.

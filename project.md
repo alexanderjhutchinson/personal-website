@@ -221,7 +221,7 @@ Each object gets one job, so visitors know where to look and nothing ends up in 
 - For the keyboard, a "Look at the photos on the pin board" button shows only once it's tabbed to, so the room keeps its no-markers rule. It goes over to the board. There, Tab goes through a button for each photo (shown only with focus, named for what the photo shows), and the photo lights up as if the pointer were on it. Enter takes it down, with focus on "Turn it over"; Enter turns it, and pinning it back brings focus back to its button. Screen readers hear what the photo shows, then what's written on the back.
 - To add or swap a photo: put the original in `Photos/`, run `npm run photos`, and add it to the list in `src/data/photos.ts` with its shape, a spot on the board, what it shows, and what's written on its back. Strip its metadata first anyway; phone photos carry their location.
 
-**Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp.
+**Lamps (built).** Click a lamp to switch it off and on again, with a small switch click when sound is on. Off, its light and the dust in its glow go out and the room dims. With both off, the room's fill light turns to moonlight blue, so the furniture still shows. The film dims the lamps as before and leaves their switches alone: a lamp switched off stays off through the film and after it. The room has two: the table lamp and the pole lamp. A warm glow under the pointer was lost in a lit lamp's own light, so a lamp leans toward what a click would do instead: lit, it dims by almost half; dark, it glows a little.
 
 **Radio (built).** One station, playing an old 78 in the spirit of Don't Starve's scratchy gramophone jazz: "Tiger Rag" by the Original Dixieland Jass Band (1918). Click the radio on the sideboard to switch it on and off, with a chunky knob click. It warms up with a burst of static, then the record fades in where it left off, and the dial glows while it plays.
 
@@ -278,6 +278,7 @@ Leaning toward 1 and 2 first: least new art, and the best fit for movie night. T
 Rules for all of them:
 
 - No markers or prompts. The cursor changes and a faint glint shows on hover. The program's pick-up prompt stays the only one.
+- A hint instead of markers, for anyone stuck: after 5 seconds on the couch without finding anything new (moving the pointer doesn't count, since that's someone looking), one thing not yet tried blinks with its hover glow until it's used, in order of importance: the projector, then the pin board, then the radio. The lamps are left out, since their dimming under the pointer says enough. What's been used is remembered (`movie-night:tried`), and the next one waits another 5 seconds. Touch screens, which have no hover, get the most from it. With reduced motion it holds a steady glow.
 - Everything works with a tap; touch screens have no hover.
 - Nothing adds work while the room sits idle (see "Performance").
 - Escape puts back whatever is open, like the program.
