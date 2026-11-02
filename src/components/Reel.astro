@@ -77,11 +77,27 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
         cards.map(({ key, item }) => (
           <article data-card={key} hidden>
             <header>
-              <span class="slot" data-icon={item.icon} />
               {item.kicker && <p class="card-kicker">{item.kicker}</p>}
-              <h2>{item.name}</h2>
+              <h2>
+                {item.href ? (
+                  <a href={item.href} target="_blank" rel="noopener">
+                    {item.lead ?? item.name}
+                  </a>
+                ) : (
+                  (item.lead ?? item.name)
+                )}
+                {item.role && <span class="card-role">{` ${item.role}`}</span>}
+              </h2>
+              {item.place && <p class="card-place">{item.place}</p>}
             </header>
             <p class="divider" aria-hidden="true"><span /></p>
+            {item.about && (
+              <div class="card-about">
+                {item.about.map((paragraph) => (
+                  <p>{paragraph}</p>
+                ))}
+              </div>
+            )}
             {item.lines.length > 0 && (
               <div class="card-lines">
                 {item.lines.map((line) => (
@@ -346,21 +362,6 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     color: var(--amber);
   }
 
-  .slot {
-    width: 60px;
-    height: 60px;
-    display: grid;
-    place-items: center;
-    flex: none;
-    border-radius: 2px;
-  }
-
-  .slot :global(img) {
-    width: 48px;
-    height: 48px;
-    image-rendering: pixelated;
-  }
-
   /* An item's card, opened from the panel on the screen: a page of the program, on its cream paper. */
   .item-card {
     width: min(28rem, calc(100% - 32px));
@@ -483,13 +484,6 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     gap: 0.35rem;
   }
 
-  .card .slot {
-    width: 56px;
-    height: 56px;
-    margin-bottom: 0.45rem;
-    background: #2b1a10;
-  }
-
   .card-kicker,
   .card h3,
   .card-link-label {
@@ -512,6 +506,44 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
     font-weight: 600;
     line-height: 1.15;
     text-wrap: balance;
+  }
+
+  /* The company's site, or the project's code. */
+  .card h2 a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: #a8481f;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.14em;
+  }
+
+  .card h2 a:hover {
+    color: #a8481f;
+  }
+
+  /* A job's title, on its own line under the company, which leads. Its leading space doesn't show, but
+     keeps the two apart for screen readers and copying. */
+  .card-role {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8em;
+    font-weight: 400;
+  }
+
+  .card-place {
+    margin: 0;
+    color: #6b5240;
+  }
+
+  /* Sentences read easier from a straight left edge; the heading stays centered over them. */
+  .card-about p {
+    margin: 0;
+    text-align: left;
+    text-wrap: pretty;
+  }
+
+  .card-about p + p {
+    margin-top: 0.6rem;
   }
 
   /* The program cover's divider: a rule each side of a diamond. */
@@ -549,8 +581,10 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
   }
 
   .card section + section,
+  .card-about + section,
   .card-lines + section,
   .card section + .card-links,
+  .card-about + .card-links,
   .card-lines + .card-links {
     margin-top: 1.1rem;
   }

@@ -74,7 +74,17 @@ export interface ContentItem {
   sub: string;
   /** On the card, the small line over the name: when, like the dates over each entry in the program. */
   kicker?: string;
-  /** Lines on the card, under the name. */
+  /** On the card, what the heading leads with, if not the name: a job's company. */
+  lead?: string;
+  /** On the card, where the heading's lead links: a company's site, or a project's code. */
+  href?: string;
+  /** On the card, the rest of the heading, on a line of its own: a job's title. */
+  role?: string;
+  /** On the card, a line under the heading, over the divider: a job's location. */
+  place?: string;
+  /** Paragraphs on the card, under the divider: what I did, or what it is. */
+  about?: string[];
+  /** Lines on the card, under the divider. The first is darker. */
   lines: string[];
   groups?: { label: string; items: string[] }[];
   links?: Link[];
@@ -119,7 +129,12 @@ export const reelItems: Record<ReelId, ContentItem[]> = {
     name: job.title,
     sub: `${job.company} · ${formatRange(job.start, job.end)}`,
     kicker: job.end ? `${formatRange(job.start, job.end)} · ${months(job.start, job.end)}` : formatRange(job.start),
-    lines: [job.company, job.location],
+    lead: job.company,
+    href: job.href,
+    role: job.title,
+    place: job.location,
+    about: job.summary,
+    lines: [],
   })),
   projects: projects.map((project) => ({
     id: project.id,
@@ -128,8 +143,10 @@ export const reelItems: Record<ReelId, ContentItem[]> = {
     name: project.name,
     sub: formatRange(project.start, project.end),
     kicker: formatRange(project.start, project.end),
+    href: project.href,
+    about: project.summary,
     lines: [],
-    groups: [{ label: "Materials", items: project.stack }],
+    groups: [{ label: "Technologies", items: project.stack }],
     links: project.links,
   })),
 };

@@ -37,7 +37,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 
 | Path | What it is |
 |---|---|
-| `src/data/jobs/`, `src/data/projects/` | One file per job or project. Add a file and it shows up on its reel and in the program. |
+| `src/data/jobs/`, `src/data/projects/` | One file per job or project. Add a file and it shows up on its reel and in the program. Its `summary` is the sentences on its card, and `href` is where its name links. |
 | `src/data/profile.ts` | Name, education, skills, about, contact links. |
 | `src/data/index.ts` | Loads the content, formats dates, lists the reels, and turns content into reel items. |
 | `src/data/program.ts` | What's printed in the program, page by page. The 3D paper and the plain HTML version both use it. |
@@ -71,7 +71,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/lobby/scenes.ts` | The three scenes (home base, mine, workshop): layout, doors, light, backdrop, props. |
 | `src/lobby/world.ts` | The tile grid, mining, the edge doorways, and the light map. |
 | `src/lobby/player.ts` | Movement, jumping, wandering, and walking to a door. |
-| `src/lobby/content.ts` | Pixel icons for content items, and the item card. |
+| `src/lobby/content.ts` | Pixel icons for content items (on the screen's panel), and opening the item cards. |
 | `src/lobby/decor.ts` | Props: signs, workbench, anvil, furnace, chest, mine cart. |
 | `src/lobby/draw.ts` | Draws a reel's scene: sky, walls, props, blocks, and light. |
 | `src/lobby/still.ts` | A reel's opening frame as a picture, for the room's projector to show under the live reel and as the film ends. |
