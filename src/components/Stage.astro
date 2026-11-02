@@ -1,4 +1,7 @@
 ---
+import "@fontsource/indie-flower/400.css";
+import { PHOTOS } from "../data/photos";
+
 interface Props {
   /** Open with the program already picked up. */
   open?: "program";
@@ -43,17 +46,24 @@ const { open } = Astro.props;
     <button class="reel-button" type="button" data-put-down>Put it down <kbd>Esc</kbd></button>
   </div>
 
-  <!-- At the pin board. -->
+  <!-- At the pin board. For the keyboard, a button for each photo, shown only while it has focus. -->
   <div class="board-bar" role="group" aria-label="The pin board">
+    {
+      PHOTOS.map((p, i) => (
+        <button class="reel-button keys-only" type="button" data-hold-photo={i}>
+          <span class="visually-hidden">Take down the photo: </span>
+          {p.about}
+        </button>
+      ))
+    }
     <button class="reel-button" type="button" data-leave-board>Back to the couch <kbd>Esc</kbd></button>
   </div>
 
   <!-- While a photo from the pin board is held up. -->
-  <div class="photo-bar" role="group" aria-label="Photos from the pin board">
-    <button class="reel-button" type="button" data-browse="-1" aria-label="Previous photo"><span aria-hidden="true">◀</span></button>
-    <p class="count" aria-live="polite"><span class="visually-hidden">Photo </span><span data-photo-count></span></p>
-    <button class="reel-button" type="button" data-browse="1" aria-label="Next photo"><span aria-hidden="true">▶</span></button>
+  <div class="photo-bar" role="group" aria-label="The photo in hand">
+    <button class="reel-button" type="button" data-turn-photo>Turn it over</button>
     <button class="reel-button" type="button" data-pin-back>Pin it back <kbd>Esc</kbd></button>
+    <p class="visually-hidden" aria-live="polite" data-photo-says></p>
   </div>
 
   <p class="skip-hint">
@@ -321,18 +331,6 @@ const { open } = Astro.props;
   .paper-bar .reel-button:disabled {
     opacity: 0.35;
     cursor: default;
-  }
-
-  .photo-bar .count {
-    margin: 0;
-    padding: 0.3em 0.7em;
-    font-family: var(--font-mono);
-    font-size: var(--step--1);
-    letter-spacing: 0.08em;
-    color: var(--ink);
-    white-space: nowrap;
-    background: rgba(15, 11, 8, 0.6);
-    border-radius: 2px;
   }
 
   .view-name {
