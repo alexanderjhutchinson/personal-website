@@ -40,11 +40,19 @@ const onTheCouch = (mode: Mode) => mode === "idle" || mode === "program" || mode
 export type HoverTarget = "projector" | "program" | "fixture" | null;
 
 /**
+ * The things in the room the hint points out. The program has a prompt of its own, and the lamps'
+ * dimming under the pointer says enough.
+ */
+export type Hint = "projector" | "board" | "radio";
+
+/**
  * Something in the room a click from the couch does something to, besides the program and the
- * projector: the room extras in project.md. Nothing points at one; the cursor changes and it
- * brightens a little under the pointer, and a tap works the same as a click.
+ * projector: the room extras in project.md. The cursor changes and it brightens a little under the
+ * pointer, and a tap works the same as a click. The hint points some of them out until they've been used.
  */
 interface Fixture {
+  /** What the hint calls it. The lamps and the pin board's photos have none. */
+  name?: Hint;
   /** What a click has to land on. */
   targets: THREE.Object3D[];
   /** Show how far the pointer's highlight has eased in, 0 to 1. */
@@ -138,6 +146,22 @@ const REEL_LAMP = 0.28;
 
 /** How far the lamps' switches are on, 0 to 1. Most of the room's light is the table lamp's. */
 const switchedOn = (s: SceneState) => 0.8 * s.tableLamp + 0.2 * s.poleLamp;
+/**
+ * How far a lamp under the pointer leans toward what a click would do: a lit one dims, and a dark
+ * one glows a little (a little goes a long way in a dark room). A highlight in its own warm color
+ * would be lost in its light.
+ */
+const LAMP_DIM = 0.45;
+const LAMP_GLOW = 0.12;
+const leaned = (on: number, lean: number) => on + lean * ((1 - on) * LAMP_GLOW - on * LAMP_DIM);
+
+/**
+ * The hint blinks one thing not yet tried, the way a game shows what can be used: seconds it stays
+ * lit, seconds dark before the next blink, and how bright it gets next to the pointer's highlight.
+ */
+const HINT_GLOW = 1;
+const HINT_REST = 0.8;
+const HINT_LEVEL = 1;
 /** The room's fill light with its lamps switched off: moonlight, like a night scene on film. */
 const NIGHT_SKY = new THREE.Color(palette.moonLight).multiplyScalar(0.55);
 const NIGHT_GROUND = new THREE.Color("#0b0f1a");
@@ -166,6 +190,8 @@ export interface TheaterOptions {
   onProgramPage: (name: string, first: boolean, last: boolean) => void;
   /** The photo in hand came up or turned over: what's showing, in words for a screen reader. */
   onPhoto: (says: string) => void;
+  /** The visitor used one of the things the hints point out. */
+  onUse?: (thing: Hint) => void;
   /** Called after every rendered frame. */
   onFrame?: () => void;
 }
@@ -247,6 +273,12 @@ export class Theater {
   private fixture: Fixture | null = null;
   /** Which way each lamp's switch was last flipped (its light may still be fading). */
   private lampsOn = { tableLamp: true, poleLamp: true };
+  /** How far each lamp leans toward what a click would do, under the pointer, 0 to 1. */
+  private lampLean = { tableLamp: 0, poleLamp: 0 };
+  /** What the hint is blinking, how far it's faded in (0 to 1), and when it started. */
+  private hint: Hint | null = null;
+  private hinting = 0;
+  private hintFrom = 0;
   private radioOn = false;
   /** The fill light's own colors, with the lamps on. */
   private warmFill!: { sky: THREE.Color; ground: THREE.Color };
@@ -299,11 +331,13 @@ export class Theater {
       this.lampSwitch("tableLamp", lamp.hitTargets, (level) => (lamp.base.emissiveIntensity = level * 0.18)),
       this.lampSwitch("poleLamp", accent.hitTargets, (level) => (accent.shades.emissiveIntensity = level * 0.25)),
       {
+        name: "radio",
         targets: radio.hitTargets,
         highlight: (level) => radio.body.forEach((m) => (m.emissiveIntensity = level * 0.22)),
         hover: 0,
         click: () => {
           const on = !this.radioOn;
+          this.opts.onUse?.("radio");
           this.opts.onRadio?.(on);
           this.sound.knob();
           this.setRadio(on);
@@ -311,6 +345,7 @@ export class Theater {
       },
       // From the couch the board is one thing: a click goes over to it.
       {
+        name: "board",
         targets: this.board.hitTargets,
         highlight: (level) => this.board.highlight(level),
         hover: 0,
@@ -467,7 +502,10 @@ export class Theater {
   private lampSwitch(key: "tableLamp" | "poleLamp", targets: THREE.Object3D[], highlight: (level: number) => void): Fixture {
     return {
       targets,
-      highlight,
+      highlight: (level) => {
+        this.lampLean[key] = level;
+        highlight(level);
+      },
       hover: 0,
       click: () => {
         const on = (this.lampsOn[key] = !this.lampsOn[key]);
@@ -497,6 +535,31 @@ export class Theater {
   /** Make the program shimmer on the table, like an item a game wants you to pick up. */
   setGlint(on: boolean) {
     gsap.to(this, { glint: on ? 1 : 0, duration: 0.6 });
+  }
+
+  /** Blink this thing, over and over, to show it can be used. Null fades the hint out. */
+  setHint(thing: Hint | null) {
+    if (thing) {
+      this.hint = thing;
+      this.hintFrom = this.time;
+    }
+    gsap.to(this, {
+      hinting: thing ? 1 : 0,
+      duration: 0.6,
+      overwrite: "auto",
+      onComplete: () => {
+        if (!thing) this.hint = null;
+      },
+    });
+  }
+
+  /** How lit this thing's hint is right now, 0 to 1. With reduced motion, the hint holds a steady glow. */
+  private hintLevel(thing: Hint | undefined) {
+    if (!thing || thing !== this.hint) return 0;
+    if (this.opts.reducedMotion) return 0.5 * HINT_LEVEL * this.hinting;
+    const t = (this.time - this.hintFrom) % (HINT_GLOW + HINT_REST);
+    const glow = t < HINT_GLOW ? Math.sin((t / HINT_GLOW) * Math.PI) ** 2 : 0;
+    return HINT_LEVEL * glow * this.hinting;
   }
 
   private quick(seconds: number) {
@@ -580,6 +643,7 @@ export class Theater {
    */
   lookAtBoard(): Promise<void> {
     if (this.mode !== "idle") return Promise.resolve();
+    this.opts.onUse?.("board");
     this.setMode("board");
     this.setHovering(null);
     return new Promise((resolve) => {
@@ -683,6 +747,7 @@ export class Theater {
    */
   start() {
     if (this.mode !== "idle") return;
+    this.opts.onUse?.("projector");
     if (this.opts.reducedMotion) {
       this.enterQuick();
       return;
@@ -1080,10 +1145,14 @@ export class Theater {
     this.hover += ((this.hovering === "projector" ? 1 : 0) - this.hover) * ease;
     this.paperHover += ((this.hovering === "program" ? 1 : 0) - this.paperHover) * ease;
     this.inHand = Math.max(s.paper, ...this.board.photos.map((p) => p.lift));
+    for (const f of [...this.fixtures, ...this.photoFixtures]) {
+      f.hover += ((this.fixture === f ? 1 : 0) - f.hover) * ease;
+      f.highlight(Math.max(f.hover, this.hintLevel(f.name)));
+    }
 
-    // Lamps: the house lights, times each lamp's own switch.
-    const table = s.lamp * s.tableLamp;
-    const pole = s.lamp * s.poleLamp;
+    // Lamps: the house lights, times each lamp's own switch, leaning toward a click under the pointer.
+    const table = s.lamp * leaned(s.tableLamp, this.lampLean.tableLamp);
+    const pole = s.lamp * leaned(s.poleLamp, this.lampLean.poleLamp);
     const lamp = this.room.lamp;
     lamp.light.intensity = 12 * table;
     lamp.shade.emissiveIntensity = 0.02 + 0.95 * table;
@@ -1097,10 +1166,6 @@ export class Theater {
     fill.color.copy(this.warmFill.sky).lerp(NIGHT_SKY, 1 - lit);
     fill.groundColor.copy(this.warmFill.ground).lerp(NIGHT_GROUND, 1 - lit);
     fill.intensity = 0.15 + s.lamp * (0.35 + 0.4 * lit);
-    for (const f of [...this.fixtures, ...this.photoFixtures]) {
-      f.hover += ((this.fixture === f ? 1 : 0) - f.hover) * ease;
-      f.highlight(f.hover);
-    }
     this.room.radio.dial.emissiveIntensity = 0.85 * s.radio;
     // Reduced motion freezes the drifting dust and smoke in place.
     const drift = this.opts.reducedMotion ? 0 : this.time;
@@ -1108,7 +1173,7 @@ export class Theater {
 
     // Projector.
     this.projector.setRunning(s.running);
-    this.projector.setHover(this.hover);
+    this.projector.setHover(Math.max(this.hover, this.hintLevel("projector")));
     this.projector.update(dt, s.reels);
     this.ventLight.intensity = s.running * 0.35;
 
