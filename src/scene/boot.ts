@@ -6,7 +6,7 @@ import type { Mode, Theater } from "./theater";
 
 // Connects the 3D room to the page: buttons, keyboard, sound preference,
 // first-visit tracking, the program (picked up and turned), the pin board
-// (gone over to, its photos taken off and looked through), and the reels,
+// (gone over to, its photos taken off and turned over), and the reels,
 // which play on the room's screen. The whole site is this one page; each
 // address opens it in a different state.
 
@@ -57,7 +57,9 @@ export function boot() {
   const pickup = $("pickup");
   const viewName = document.querySelector("[data-view-name]");
   const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
-  const photoCount = document.querySelector("[data-photo-count]");
+  const photoSays = document.querySelector("[data-photo-says]");
+  const photoPicks = document.querySelectorAll<HTMLButtonElement>("[data-hold-photo]");
+  const turnPhotoButton = document.querySelector<HTMLButtonElement>("[data-turn-photo]");
   const lookButton = $<HTMLButtonElement>("look-photos");
   if (!stage || !canvas) return;
 
@@ -129,8 +131,8 @@ export function boot() {
             lobby?.setSound(true);
           },
           onProgramPage: (name, first, last) => renderView(name, first, last),
-          onPhoto: (index, count) => {
-            if (photoCount) photoCount.textContent = `${index + 1} / ${count}`;
+          onPhoto: (says) => {
+            if (photoSays) photoSays.textContent = says;
           },
           onFrame: () => placePrompt(),
         });
@@ -252,9 +254,8 @@ export function boot() {
     } else if (theater.mode === "board") {
       theater.clickBoard(x, y);
     } else if (theater.mode === "photo") {
-      const side = theater.photoHit(x, y);
-      if (side === null) void theater.pinBack();
-      else theater.browse(side);
+      if (theater.hitsHeldPhoto(x, y)) theater.turnPhoto();
+      else void pinBack();
     }
   });
 
@@ -300,14 +301,33 @@ export function boot() {
   });
 
   // The pin board's photos, for the keyboard: the button only shows once it has focus. It goes over to
-  // the board and takes the first photo off, ready for the arrows.
+  // the board, ready to tab through the photos.
   lookButton?.addEventListener("click", async () => {
     const t = theater;
     if (t?.mode !== "idle") return;
     await t.lookAtBoard();
-    t.holdPhoto();
-    document.querySelector<HTMLButtonElement>('[data-browse="1"]')?.focus();
+    photoPicks[0]?.focus();
   });
+
+  // At the board, a button for each photo (shown only with focus) lights it up, and takes it down.
+  // Once it's pinned back, focus comes back to the button it was taken down with.
+  let heldFrom: HTMLButtonElement | null = null;
+  photoPicks.forEach((b, i) => {
+    b.addEventListener("focus", () => theater?.pointAtPhoto(i));
+    b.addEventListener("blur", () => theater?.pointAtPhoto(null));
+    b.addEventListener("click", () => {
+      if (theater?.mode !== "board") return;
+      theater.holdPhoto(i);
+      heldFrom = b;
+      turnPhotoButton?.focus();
+    });
+  });
+  const pinBack = async () => {
+    await theater?.pinBack();
+    const at = document.activeElement;
+    if (heldFrom && (at === document.body || at?.closest(".photo-bar"))) heldFrom.focus();
+    heldFrom = null;
+  };
 
   endButton?.addEventListener("click", (e) => {
     if (!theater) return;
@@ -336,10 +356,8 @@ export function boot() {
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-browse]")
-    .forEach((b) => b.addEventListener("click", () => theater?.browse(Number(b.dataset.browse) < 0 ? -1 : 1)));
-  document.querySelectorAll("[data-pin-back]").forEach((b) => b.addEventListener("click", () => void theater?.pinBack()));
+  turnPhotoButton?.addEventListener("click", () => theater?.turnPhoto());
+  document.querySelectorAll("[data-pin-back]").forEach((b) => b.addEventListener("click", () => void pinBack()));
   document.querySelectorAll("[data-leave-board]").forEach((b) => b.addEventListener("click", () => void theater?.leaveBoard()));
 
   // Keyboard. While a reel plays, the keys are the game's.
@@ -360,7 +378,7 @@ export function boot() {
     } else if (theater.mode === "reel" || theater.mode === "entering") endFeature();
     else if (theater.mode === "playing") theater.abort();
     else if (theater.mode === "program") putDown();
-    else if (theater.mode === "photo") void theater.pinBack();
+    else if (theater.mode === "photo") void pinBack();
     else if (theater.mode === "board") void theater.leaveBoard();
   };
 
@@ -393,18 +411,11 @@ export function boot() {
         else return;
         e.preventDefault();
         break;
-      case "board":
-        // The arrows, or Enter, take a photo off the board: the first, or going left, the last.
-        if (key === "arrowright" || key === "d" || (!onControl && (key === "enter" || key === " "))) theater.holdPhoto();
-        else if (key === "arrowleft" || key === "a") theater.holdPhoto(-1);
-        else return;
-        e.preventDefault();
-        break;
       case "photo":
-        if (key === "arrowleft" || key === "a") theater.browse(-1);
-        else if (key === "arrowright" || key === "d") theater.browse(1);
-        else return;
+        // Enter turns the photo in hand over, as a click on it does.
+        if (onControl || (key !== "enter" && key !== " ")) return;
         e.preventDefault();
+        theater.turnPhoto();
         break;
     }
   });

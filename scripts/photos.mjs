@@ -1,7 +1,7 @@
 // Makes the pin board's web copies from the original photos in Photos/, which git ignores: a small one
 // for the board, loaded with the room, and a large one loaded when a photo is held up. Each is turned
 // upright, converted to sRGB, and saved as WebP with no metadata (sharp leaves it all out unless asked).
-// Run with `npm run photos`, then add any new photo to the list in src/scene/board.ts.
+// Run with `npm run photos`, then add any new photo to the list in src/data/photos.ts.
 import { mkdir, readdir } from "node:fs/promises";
 import sharp from "sharp";
 

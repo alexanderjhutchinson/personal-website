@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PHOTOS, type Snapshot } from "../data/photos";
 import { BOARD } from "./layout";
 import { palette } from "./palette";
 import * as tex from "./textures";
@@ -6,39 +7,14 @@ import * as tex from "./textures";
 /**
  * The pin board on the back wall: photos pinned to cork, and a ticket stub. From the couch the board
  * is one thing to click, which takes the camera over to it; there, a photo clicked comes off its pin
- * and up to the camera. The theater does the moving.
+ * and up to the camera, where a click turns it over to what's written on its back. The theater does the
+ * moving.
  *
- * The photos are web copies in public/photos, made from the originals by scripts/photos.mjs. Each print
- * is painted twice: small for the board, from the small copy loaded with the room, and sharp from the
- * large copy, loaded only once it's held up.
+ * The photos (listed in src/data/photos.ts) are web copies in public/photos, made from the originals by
+ * scripts/photos.mjs. Each print is painted twice: small for the board, from the small copy loaded with
+ * the room, and sharp from the large copy, loaded only once it's held up. Its back is painted only while
+ * it's held up.
  */
-
-interface Snapshot {
-  /** Its web copies' name in public/photos: NAME-small.webp and NAME-large.webp. */
-  photo: string;
-  /** The picture's width over its height. */
-  aspect: number;
-  /** Its center on the board, in meters from the board's center, and its tilt in degrees. */
-  at: [x: number, y: number, tilt: number];
-}
-
-/** In the order the arrows go through them: the top row, then the bottom. */
-const SNAPSHOTS: Snapshot[] = [
-  // A rest in the mountains, on film.
-  { photo: "001717310027", aspect: 3 / 2, at: [-0.35, 0.15, -4] },
-  // Dumplings round a big table.
-  { photo: "img_1593", aspect: 3 / 4, at: [-0.13, 0.13, 3] },
-  // Graduation.
-  { photo: "img_1982", aspect: 4 / 3, at: [0.095, 0.16, -2] },
-  // Out front of a restaurant in the holiday lights. A night photo, so the lamp's bright spot suits it.
-  { photo: "img_1595", aspect: 3 / 4, at: [0.345, 0.12, 5] },
-  // A night out, on an old digital camera.
-  { photo: "dsc02006", aspect: 3 / 4, at: [-0.32, -0.15, 4] },
-  // A shrine by a pond.
-  { photo: "img_1592", aspect: 4 / 3, at: [-0.07, -0.17, -3] },
-  // The road behind, in a mirror on a mountain road.
-  { photo: "img_1594", aspect: 2 / 3, at: [0.19, -0.15, 2] },
-];
 
 /** The picture's long side and the white border around it, in meters. */
 const PICTURE = 0.19;
@@ -46,12 +22,21 @@ const BORDER = 0.012;
 /** Pixels on a print's long side: on the board, and held up close. */
 const SMALL = 512;
 const SHARP = 1600;
+/** Pixels on the long side of a print's back, which is only ever seen held up. */
+const BACK = 1024;
+/** How far below a print's top edge its pin goes through, in meters. */
+const PIN_DROP = 0.016;
 /** The cork's face, out from the wall. */
 const CORK = 0.02;
 const PIN_COLORS = [palette.rust, palette.mustard, palette.avocado, palette.cream, palette.burntOrange];
 
+type PrintMesh = THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
+
 export interface BoardPhoto {
-  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
+  snapshot: Snapshot;
+  /** The print's face, and its back (a child of the face, facing the other way). */
+  mesh: PrintMesh;
+  back: PrintMesh;
   /** The print's size, border included, in meters. */
   width: number;
   height: number;
@@ -59,6 +44,8 @@ export interface BoardPhoto {
   home: { position: THREE.Vector3; quaternion: THREE.Quaternion };
   /** 0 pinned to the board, 1 held up to the camera. */
   lift: number;
+  /** 0 face up, 1 turned over to its back (only while held up). */
+  flip: number;
   /** The pointer's highlight, 0 to 1. */
   hover: number;
 }
@@ -73,7 +60,10 @@ export interface Board {
   hover: number;
   /** Brighten the whole board under the pointer, from the couch. */
   highlight(level: number): void;
-  /** Paint a photo's print sharp enough to hold up close (once its large copy loads), or go back to the board's small print. */
+  /**
+   * Paint a photo sharp enough to hold up close: its print (once its large copy loads) and its back. Or
+   * go back to the board's small print, with no back.
+   */
   sharpen(photo: BoardPhoto, sharp: boolean): void;
 }
 
@@ -147,12 +137,12 @@ export function buildBoard(): Board {
   };
 
   const Z = new THREE.Vector3(0, 0, 1);
-  const layouts = SNAPSHOTS.map(printLayout);
+  const layouts = PHOTOS.map(printLayout);
   // Each print's small texture, blank until its photo loads; and whether it's wanted sharp, or loading so.
   const small: THREE.Texture[] = [];
-  const wantSharp = SNAPSHOTS.map(() => false);
-  const loadingSharp = SNAPSHOTS.map(() => false);
-  const photos = SNAPSHOTS.map((s, i): BoardPhoto => {
+  const wantSharp = PHOTOS.map(() => false);
+  const loadingSharp = PHOTOS.map(() => false);
+  const photos = PHOTOS.map((s, i): BoardPhoto => {
     const layout = layouts[i];
     const map = tex.print(null, layout, SMALL);
     small.push(map);
@@ -160,6 +150,14 @@ export function buildBoard(): Board {
     const material = new THREE.MeshStandardMaterial({ map, emissiveMap: map, emissive: "#ffffff", emissiveIntensity: 0, roughness: 0.62 });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(layout.width, layout.height), material);
     mesh.userData.photo = i;
+    // Matte paper on the back, hidden until it's painted. Turned to face the other way, it reads the right way round.
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(layout.width, layout.height).rotateY(Math.PI),
+      new THREE.MeshStandardMaterial({ emissive: "#ffffff", emissiveIntensity: 0, roughness: 0.9 }),
+    );
+    back.position.z = -0.0002;
+    back.visible = false;
+    mesh.add(back);
     const [x, y, tilt] = s.at;
     const angle = THREE.MathUtils.degToRad(tilt);
     // Each print a hair in front of the one before, so overlapping corners don't flicker.
@@ -171,13 +169,13 @@ export function buildBoard(): Board {
     mesh.position.copy(home.position);
     mesh.quaternion.copy(home.quaternion);
     group.add(mesh);
-    const top = layout.height / 2 - 0.016;
+    const top = layout.height / 2 - PIN_DROP;
     pin(x - Math.sin(angle) * top, y + Math.cos(angle) * top, CORK + 0.008, i);
-    return { mesh, width: layout.width, height: layout.height, home, lift: 0, hover: 0 };
+    return { snapshot: s, mesh, back, width: layout.width, height: layout.height, home, lift: 0, flip: 0, hover: 0 };
   });
 
   // The small prints come in with the room, each in its own time. A photo that doesn't load stays blank.
-  SNAPSHOTS.forEach((s, i) => {
+  PHOTOS.forEach((s, i) => {
     load(s, "small")
       .then((image) => {
         const m = photos[i].mesh.material;
@@ -212,18 +210,30 @@ export function buildBoard(): Board {
     sharpen(photo, sharp) {
       const i = photos.indexOf(photo);
       const m = photo.mesh.material;
+      const b = photo.back.material;
       wantSharp[i] = sharp;
       if (!sharp) {
         if (m.map !== small[i]) {
           m.map?.dispose();
           m.map = m.emissiveMap = small[i];
         }
+        if (b.map) {
+          b.map.dispose();
+          b.map = b.emissiveMap = null;
+          b.needsUpdate = true;
+          photo.back.visible = false;
+        }
         return;
+      }
+      if (!b.map) {
+        b.map = b.emissiveMap = tex.printBack(layouts[i], photo.snapshot, BACK, PIN_DROP / photo.height, i);
+        b.needsUpdate = true;
+        photo.back.visible = true;
       }
       if (m.map !== small[i] || loadingSharp[i]) return;
       // The small print shows, scaled up, until the large photo is in.
       loadingSharp[i] = true;
-      load(SNAPSHOTS[i], "large")
+      load(PHOTOS[i], "large")
         .then((image) => {
           if (wantSharp[i] && m.map === small[i]) m.map = m.emissiveMap = tex.print(image, layouts[i], SHARP);
         })

@@ -21,7 +21,7 @@ Then open http://localhost:4321.
 
 `npm run build` type-checks and builds the static site into `dist/`. `npm run preview` serves that build.
 
-`npm run photos` remakes the pin board's photos from the originals in `Photos/`, which git ignores: a small and a large WebP of each in `public/photos/`, upright and with no metadata (no location, camera or dates). Add a new one to the list in `src/scene/board.ts`.
+`npm run photos` remakes the pin board's photos from the originals in `Photos/`, which git ignores: a small and a large WebP of each in `public/photos/`, upright and with no metadata (no location, camera or dates). Add a new one to the list in `src/data/photos.ts`, with what's written on its back.
 
 ## Hosting
 
@@ -41,6 +41,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/data/profile.ts` | Name, education, skills, about, contact links. |
 | `src/data/index.ts` | Loads the content, formats dates, lists the reels, and turns content into reel items. |
 | `src/data/program.ts` | What's printed in the program, page by page. The 3D paper and the plain HTML version both use it. |
+| `src/data/photos.ts` | The pin board's photos: where each is pinned, what it shows (for screen readers), and what's written on its back. |
 | `src/pages/index.astro`, `program.astro`, `[reel].astro` | Every address is the same room, opened in a different state: on the couch, with the program in hand, or with a reel playing on the screen. |
 | `src/components/Room.astro` | The one page: the stage, the reels, and the program for when the room can't run. |
 | `src/components/Stage.astro` | Canvas and everything over the room: sound, the pick-up prompt, the controls while holding the program or a photo. |
@@ -53,7 +54,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 | `src/scene/seating.ts` | The loveseat and the lounge chair, upholstered in a painted tweed. |
 | `src/scene/projector.ts` | The Super 8 projector and its reels. |
 | `src/scene/program.ts` | The program on the coffee table: a folded sheet that opens and turns over. |
-| `src/scene/board.ts`, `public/photos/`, `scripts/photos.mjs` | The pin board beside the screen: cork in a walnut frame, photos on pushpins, and a ticket stub. Each photo has a small copy, loaded with the room, and a large one, loaded when it's held up. The script makes them from the originals. |
+| `src/scene/board.ts`, `public/photos/`, `scripts/photos.mjs` | The pin board beside the screen: cork in a walnut frame, photos on pushpins, and a ticket stub. Each photo has a small copy, loaded with the room, and a large one, loaded when it's held up, and a back painted with its handwriting while it's held up. The script makes the copies from the originals. |
 | `src/scene/programPages.ts` | Paints the program's four pages, and where the reels and links on them are. |
 | `src/scene/beam.ts` | The projector beam and the dust in it and around the lamp. |
 | `src/scene/film.ts` | What's on the screen: leader, countdown, a still of a reel, the film running out, film damage. |
@@ -82,7 +83,7 @@ To try the hosted setup locally, build first, then run `npx wrangler dev`.
 - **First visit:** the full opening, about 4 seconds. **Later visits:** a short version, under 2 seconds. Any click or key skips it.
 - **The lamps:** click the table lamp or the pole lamp to switch it off and on. Nothing points them out: the cursor changes and the lamp brightens a little under the pointer. With both off, the room is lit by the moon through the window. The film dims the lamps as before but leaves their switches alone, so a lamp switched off stays off after the film.
 - **The radio:** click the radio on the sideboard to switch it on and off. One station, playing "Tiger Rag" by the Original Dixieland Jass Band (1918), a public-domain recording from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tiger_Rag_ODJB.ogg). Switching it on turns the site's sound on; turning sound off switches it off. The film turns it down, and it comes back up after.
-- **The pin board:** beside the screen, above the radio. Click it and the camera goes over to it. There, click a photo and it comes off its pin and up to the camera, with "3 / 7" below. The arrows (or a click on either half of the photo) go through the board; Escape, a click off the photo, or "Pin it back" puts it back on the board. Escape again, a click off the board, or "Back to the couch" goes back. For the keyboard, a "Look at the photos" button shows when tabbed to.
+- **The pin board:** beside the screen, above the radio. Click it and the camera goes over to it. There, click a photo and it comes off its pin and up to the camera. A click on it (or "Turn it over") turns it over to what's written on the back, and again turns it back. Escape, a click off the photo, or "Pin it back" puts it back on the board. Escape again, a click off the board, or "Back to the couch" goes back. For the keyboard, a "Look at the photos" button shows when tabbed to, and at the board Tab goes through the photos, lighting each up.
 - **Sound:** off until turned on. The choice is remembered.
 - **Escape** always backs out of whatever is on top, one layer at a time: an item card, then the plain program, then the film (back to the couch, like the ×). During the opening it stops the film; with the program in hand it puts it down; with a photo in hand it pins it back, and at the pin board it goes back to the couch.
 - **Ending:** the × in the top-right corner. The reel holds a beat, the film runs out, the camera pulls back to the couch, and the lights come up. No page load, ever: it's all one page.

@@ -8,6 +8,8 @@ import { rng } from "./random";
 export const FONT_DISPLAY = '"Fraunces Variable", Georgia, serif';
 export const FONT_BODY = '"Instrument Sans Variable", "Helvetica Neue", Arial, sans-serif';
 export const FONT_MONO = '"IBM Plex Mono", "Courier New", monospace';
+/** Handwriting, for the backs of the photos. */
+export const FONT_HAND = '"Indie Flower", "Bradley Hand", cursive';
 
 let maxAnisotropy = 4;
 export function setMaxAnisotropy(value: number) {
@@ -568,6 +570,113 @@ export function print(photo: HTMLImageElement | null, layout: PrintLayout, longS
   }
   fadePrint(ctx, pw, ph);
   ctx.restore();
+  const t = texture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/**
+ * The back of a print, the same shape as its face, seen from behind: plain paper with the coordinates
+ * printed faint along the bottom (if given), the hole its pushpin left (pinAt down from the top, as a
+ * fraction of its height), and what's written on it in black pen, a line each, the first bigger. The
+ * writing sits somewhere toward the middle, or tucked into the bottom right corner; just where, and its
+ * slope, change from print to print (with seed).
+ */
+export function printBack(
+  layout: PrintLayout,
+  writing: { back: string[]; coordinates?: string; bottomRight?: boolean },
+  longSide: number,
+  pinAt: number,
+  seed: number,
+) {
+  const { back: lines, coordinates, bottomRight } = writing;
+  const W = Math.round(layout.aspect >= 1 ? longSide : longSide * layout.aspect);
+  const H = Math.round(layout.aspect >= 1 ? longSide / layout.aspect : longSide);
+  const { c, ctx } = canvas(W, H);
+  const u = Math.min(W, H) / 100;
+  const r = rng(300 + seed);
+  const paper = ctx.createLinearGradient(0, 0, W, H);
+  paper.addColorStop(0, "#efe6d2");
+  paper.addColorStop(1, "#e0d5bf");
+  ctx.fillStyle = paper;
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < (W * H) / 90; i++) {
+    ctx.fillStyle = r() < 0.5 ? "rgba(90, 70, 50, 0.05)" : "rgba(255, 252, 245, 0.1)";
+    ctx.fillRect(r() * W, r() * H, u * 0.3, u * 0.3);
+  }
+
+  if (coordinates) {
+    ctx.fillStyle = "rgba(92, 80, 120, 0.4)";
+    ctx.font = `500 ${2.8 * u}px ${FONT_MONO}`;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(coordinates, 5 * u, H - 4.5 * u);
+  }
+
+  // The pinhole: the pin went in from the front, so the paper is pushed out around it here.
+  const px = W / 2;
+  const py = pinAt * H;
+  ctx.strokeStyle = "rgba(255, 252, 245, 0.55)";
+  ctx.lineWidth = 0.35 * u;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + r();
+    ctx.beginPath();
+    ctx.moveTo(px + Math.cos(a) * 0.6 * u, py + Math.sin(a) * 0.6 * u);
+    ctx.lineTo(px + Math.cos(a) * 1.5 * u, py + Math.sin(a) * 1.5 * u);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(48, 36, 28, 0.7)";
+  ctx.beginPath();
+  ctx.arc(px, py, 0.7 * u, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The writing, wherever it was put on this one, each letter a little off the line, the ink heavier in places.
+  // In the corner it's written up against the right edge, with the last line a little above the bottom.
+  const left = bottomRight ? 0 : (6 + r() * 12) * u;
+  const right = bottomRight ? (5 + r() * 5) * u : 7 * u;
+  const room = W - left - right - (bottomRight ? 6 * u : 0);
+  const sized = lines.map((line, i) => {
+    let size = (i === 0 ? 11 : 8) * u;
+    ctx.font = `${size}px ${FONT_HAND}`;
+    const width = ctx.measureText(line).width;
+    if (width > room) size *= room / width;
+    return size;
+  });
+  // Each line's baseline, down from the first's.
+  const baselines = sized.map((_, i) => sized.slice(1, i + 1).reduce((y, size) => y + size * 1.35, 0));
+  ctx.save();
+  if (bottomRight) {
+    const slope = -0.045 + r() * 0.04;
+    const last = baselines.at(-1) ?? 0;
+    const longest = Math.max(
+      0,
+      ...lines.map((line, i) => {
+        ctx.font = `${sized[i]}px ${FONT_HAND}`;
+        return ctx.measureText(line).width;
+      }),
+    );
+    // Sloping up, the start of the longest line sits lower than the corner, so the corner comes up to match.
+    ctx.translate(W - right, H - (8 + r() * 4) * u - last - Math.sin(-slope) * longest);
+    ctx.rotate(slope);
+  } else {
+    ctx.translate(left, H * (layout.aspect >= 1 ? 0.28 + r() * 0.3 : 0.2 + r() * 0.4));
+    ctx.rotate(-0.08 + r() * 0.09);
+  }
+  lines.forEach((line, i) => {
+    const size = sized[i];
+    ctx.font = `${size}px ${FONT_HAND}`;
+    const start = bottomRight ? -ctx.measureText(line).width : 0;
+    for (let k = 0; k < line.length; k++) {
+      const x = start + ctx.measureText(line.slice(0, k)).width;
+      ctx.save();
+      ctx.translate(x, baselines[i] + (r() - 0.5) * size * 0.05);
+      ctx.rotate((r() - 0.5) * 0.05);
+      ctx.fillStyle = `rgba(22, 20, 18, ${0.8 + r() * 0.16})`;
+      ctx.fillText(line[k], 0, 0);
+      ctx.restore();
+    }
+  });
+  ctx.restore();
+
   const t = texture(c);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;

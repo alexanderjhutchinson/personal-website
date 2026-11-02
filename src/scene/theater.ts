@@ -20,13 +20,13 @@ import { clamp, lerp } from "./random";
 import { buildRoom, type Room } from "./room";
 import { ScenePass } from "./scenePass";
 import { ProjectorSound } from "./sound";
-import { FONT_BODY, FONT_DISPLAY, FONT_MONO, setMaxAnisotropy } from "./textures";
+import { FONT_BODY, FONT_DISPLAY, FONT_HAND, FONT_MONO, setMaxAnisotropy } from "./textures";
 
 /**
  * - idle: the room, lamp on, waiting for the projector to be started
  * - program: the program is picked up and held in front of the camera
  * - board: the camera has gone over to the pin board and faces it
- * - photo: a photo is off the pin board and held in front of the camera
+ * - photo: a photo is off the pin board and held in front of the camera, face up or turned over
  * - playing: the start sequence is running
  * - entering: the camera has reached the screen and the reel is fading in over it
  * - reel: a reel is playing on the screen, drawn into the room as the screen's picture
@@ -123,6 +123,8 @@ const tablePos = new THREE.Vector3();
 const tableQuat = new THREE.Quaternion();
 const heldPos = new THREE.Vector3();
 const toPhoto = new THREE.Vector3();
+const heldQuat = new THREE.Quaternion();
+const turnQuat = new THREE.Quaternion();
 const forward = new THREE.Vector3();
 const up = new THREE.Vector3();
 const right = new THREE.Vector3();
@@ -162,8 +164,8 @@ export interface TheaterOptions {
   onRadio?: (on: boolean) => void;
   /** The held program turned to another view; first and last say whether it can turn further. */
   onProgramPage: (name: string, first: boolean, last: boolean) => void;
-  /** A photo came off the pin board: where it is in the board's order. */
-  onPhoto: (index: number, count: number) => void;
+  /** The photo in hand came up or turned over: what's showing, in words for a screen reader. */
+  onPhoto: (says: string) => void;
   /** Called after every rendered frame. */
   onFrame?: () => void;
 }
@@ -265,6 +267,7 @@ export class Theater {
         document.fonts.load(`500 23px ${FONT_BODY}`),
         document.fonts.load(`700 120px ${FONT_BODY}`),
         document.fonts.load(`500 17px ${FONT_MONO}`),
+        document.fonts.load(`40px ${FONT_HAND}`),
       ]),
       new Promise((resolve) => setTimeout(resolve, 2500)),
     ]);
@@ -420,11 +423,9 @@ export class Theater {
     return { action: this.program.actionAt(hit), side: clientX < rect.left + rect.width / 2 ? -1 : 1 };
   }
 
-  /** Which half of the held photo a click lands on (-1 left, 1 right), or null if it misses the photo. */
-  photoHit(clientX: number, clientY: number): -1 | 1 | null {
-    if (!this.heldPhoto || !this.raycast(clientX, clientY, [this.heldPhoto.mesh]).length) return null;
-    const rect = this.canvas.getBoundingClientRect();
-    return clientX < rect.left + rect.width / 2 ? -1 : 1;
+  /** Whether a click at this client position lands on the photo in hand, either side up. */
+  hitsHeldPhoto(clientX: number, clientY: number) {
+    return !!this.heldPhoto && this.raycast(clientX, clientY, [this.heldPhoto.mesh]).length > 0;
   }
 
   /** Click the fixture at this client position, if there is one. */
@@ -616,40 +617,39 @@ export class Theater {
     await this.leaveBoard();
   }
 
-  /** At the pin board, take a photo off it and hold it up to the camera: the board's first, or this one (from the end if negative). */
-  holdPhoto(index = 0) {
-    const photo = this.board.photos.at(index);
+  /** At the pin board, light up a photo the way the pointer does (for the keyboard), or none. */
+  pointAtPhoto(index: number | null) {
+    if (this.mode !== "board") return;
+    this.lastInput = performance.now();
+    this.fixture = index === null ? null : (this.photoFixtures[index] ?? null);
+  }
+
+  /** At the pin board, take this photo off it and hold it up to the camera, face up. */
+  holdPhoto(index: number) {
+    const photo = this.board.photos[index];
     if (this.mode !== "board" || !photo) return;
     this.setMode("photo");
     this.setHovering(null);
-    this.liftPhoto(photo, null);
-  }
-
-  /** The next or previous photo on the board: the one in hand goes back on its pin as that one comes off. */
-  browse(dir: -1 | 1) {
-    if (this.mode !== "photo" || !this.heldPhoto || this.photoTl) return;
-    const photos = this.board.photos;
-    this.liftPhoto(photos[(photos.indexOf(this.heldPhoto) + dir + photos.length) % photos.length], this.heldPhoto);
-  }
-
-  private liftPhoto(photo: BoardPhoto, from: BoardPhoto | null) {
-    const photos = this.board.photos;
     this.heldPhoto = photo;
+    photo.flip = 0;
     this.board.sharpen(photo, true);
-    this.opts.onPhoto(photos.indexOf(photo), photos.length);
+    this.opts.onPhoto(photo.snapshot.about);
     this.sound.pin();
     this.sound.rustle(0.4);
     this.photoTl?.kill();
-    const tl = gsap.timeline({
-      onComplete: () => {
-        this.photoTl = null;
-        for (const p of photos) if (p !== photo) this.board.sharpen(p, false);
-      },
-    });
-    this.photoTl = tl;
-    const ease = "power2.inOut";
-    if (from) tl.to(from, { lift: 0, duration: this.quick(0.7), ease }, 0);
-    tl.to(photo, { lift: 1, duration: this.quick(0.8), ease }, from ? this.quick(0.12) : 0);
+    this.photoTl = gsap.timeline({ onComplete: () => (this.photoTl = null) });
+    this.photoTl.to(photo, { lift: 1, duration: this.quick(0.8), ease: "power2.inOut" });
+  }
+
+  /** Turn the photo in hand over, to what's written on its back, or back to its face. */
+  turnPhoto() {
+    const photo = this.heldPhoto;
+    if (this.mode !== "photo" || !photo) return;
+    const over = photo.flip < 0.5;
+    const back = photo.snapshot.back;
+    this.opts.onPhoto(!over ? photo.snapshot.about : back.length ? `On the back: ${back.join(", ")}` : "Nothing on the back");
+    this.sound.rustle(0.25);
+    gsap.to(photo, { flip: over ? 1 : 0, duration: this.quick(0.6), ease: "power2.inOut", overwrite: "auto" });
   }
 
   /** Pin the photo in hand back on the board, and look at the board again. Resolves once it's back. */
@@ -657,6 +657,7 @@ export class Theater {
     if (this.mode !== "photo") return Promise.resolve();
     this.photoTl?.kill();
     const photos = this.board.photos;
+    if (this.heldPhoto) gsap.killTweensOf(this.heldPhoto, "flip");
     this.sound.rustle(0.3);
     return new Promise((resolve) => {
       const tl = gsap.timeline({
@@ -670,8 +671,8 @@ export class Theater {
         },
       });
       this.photoTl = tl;
-      // Any photo still on its way back from browsing goes back too.
-      for (const p of photos) if (p.lift > 0) tl.to(p, { lift: 0, duration: this.quick(0.7), ease: "power2.inOut" }, 0);
+      // Turned face up again on the way back.
+      for (const p of photos) if (p.lift > 0) tl.to(p, { lift: 0, flip: 0, duration: this.quick(0.7), ease: "power2.inOut" }, 0);
     });
   }
 
@@ -909,8 +910,8 @@ export class Theater {
       const photo = this.fixtureAt(e.clientX, e.clientY, this.photoFixtures);
       this.setHovering(photo ? "fixture" : null, photo);
     } else if (this.mode === "photo") {
-      // Over the photo, a click goes to the next or previous one; off it, a click pins it back.
-      this.canvas.style.cursor = this.photoHit(e.clientX, e.clientY) !== null ? "pointer" : "";
+      // Over the photo, a click turns it over; off it, a click pins it back.
+      this.canvas.style.cursor = this.hitsHeldPhoto(e.clientX, e.clientY) ? "pointer" : "";
     }
   }
 
@@ -955,7 +956,11 @@ export class Theater {
 
   private get frameRate() {
     if (!onTheCouch(this.mode)) return MOVING_RATE;
-    const moving = gsap.isTweening(this.state) || !!this.photoTl || performance.now() - this.lastInput < SETTLE_MS;
+    const moving =
+      gsap.isTweening(this.state) ||
+      !!this.photoTl ||
+      (!!this.heldPhoto && gsap.isTweening(this.heldPhoto)) ||
+      performance.now() - this.lastInput < SETTLE_MS;
     return moving ? MOVING_RATE : STILL_RATE;
   }
 
@@ -1207,24 +1212,28 @@ export class Theater {
       const { mesh, home } = p;
       // On the board it brightens a little under the pointer, or with the whole board from the couch;
       // held up, it's lit to see.
-      mesh.material.emissiveIntensity = lerp(0.22 * Math.max(p.hover, this.board.hover), 0.92, p.lift);
+      mesh.material.emissiveIntensity = p.back.material.emissiveIntensity = lerp(0.22 * Math.max(p.hover, this.board.hover), 0.92, p.lift);
       if (p.lift <= 0) {
         mesh.position.copy(home.position);
         mesh.position.z += 0.008 * p.hover;
         mesh.quaternion.copy(home.quaternion);
         continue;
       }
-      // Held close enough to fill most of the view, a little above the controls.
-      const d = Math.max(p.height / (0.72 * 2 * tan), p.width / (0.86 * 2 * tan * cam.aspect));
+      // Held close enough to fill most of the view, a little above the controls. Drawn back a little
+      // while it turns over, so its near edge doesn't come at the viewer.
+      const turning = (Math.sin(Math.PI * clamp(p.flip, 0, 1)) * p.width) / 2;
+      const d = Math.max(p.height / (0.72 * 2 * tan), p.width / (0.86 * 2 * tan * cam.aspect)) + turning;
       heldPos.copy(cam.position).addScaledVector(forward, d).addScaledVector(up, 2 * d * tan * 0.04);
       // Come in so its size on screen grows evenly, rather than all at the end: lerp the
       // inverse of its depth, then find how far along the way that depth is.
       const far = toPhoto.copy(home.position).sub(cam.position).dot(forward);
       const depth = 1 / lerp(1 / far, 1 / d, p.lift);
       mesh.position.lerpVectors(home.position, heldPos, (far - depth) / (far - d));
-      mesh.quaternion.slerpQuaternions(home.quaternion, cam.quaternion, p.lift);
-      // While one goes back as the next comes off, the veil stays behind both.
-      heldAt = Math.max(heldAt ?? 0, d);
+      // Turned over about its upright, the way a print is turned in the hand.
+      heldQuat.copy(cam.quaternion).multiply(turnQuat.setFromAxisAngle(UP, Math.PI * p.flip));
+      mesh.quaternion.slerpQuaternions(home.quaternion, heldQuat, p.lift);
+      // The veil stays behind its far edge as it turns.
+      heldAt = Math.max(heldAt ?? 0, d + turning);
     }
     return heldAt;
   }
