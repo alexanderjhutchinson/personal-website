@@ -170,31 +170,12 @@ export function contentIcon(kind: IconKind) {
   return c;
 }
 
-const urls = new Map<IconKind, string>();
-function iconUrl(kind: IconKind) {
-  let url = urls.get(kind);
-  if (!url) {
-    url = contentIcon(kind).toDataURL();
-    urls.set(kind, url);
-  }
-  return url;
-}
-
 /**
  * The item cards (and the reel's item list for screen readers) are rendered
- * into the page by Astro. This fills in their pixel icons and opens a card
- * when an item is clicked, here or in the panel drawn on the reel.
+ * into the page by Astro. This opens a card when an item is clicked, here or
+ * in the panel drawn on the reel.
  */
 export function mountContent(onOpen?: (key: string) => void) {
-  for (const el of document.querySelectorAll<HTMLElement>("[data-icon]")) {
-    const kind = el.dataset.icon as IconKind;
-    if (!(kind in ICONS) || el.querySelector("img")) continue;
-    const img = document.createElement("img");
-    img.alt = "";
-    img.src = iconUrl(kind);
-    el.append(img);
-  }
-
   const dialog = document.getElementById("item-card") as HTMLDialogElement | null;
   if (!dialog) return null;
   const cards = dialog.querySelectorAll<HTMLElement>("[data-card]");

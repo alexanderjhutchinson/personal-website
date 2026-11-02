@@ -27,20 +27,28 @@ export interface Link {
 export interface Job {
   title: string;
   company: string;
+  /** The company's site, which its name links to on the card. */
+  href?: string;
   location: string;
   start: YearMonth;
   /** Leave out while it's the current role. */
   end?: YearMonth;
   icon?: IconKind;
+  /** What I did there, a paragraph each, under the divider on its card. */
+  summary: string[];
 }
 
 export interface Project {
   name: string;
+  /** Where its name links to on the card: its code, or its site. */
+  href?: string;
   start: YearMonth;
   /** Leave out while it's ongoing. */
   end?: YearMonth;
-  /** The tech stack, shown as the item's crafting materials. */
+  /** The tech stack, listed as "Technologies" on its card. */
   stack: string[];
   icon?: IconKind;
   links?: Link[];
+  /** What it is and how it works, a paragraph each, under the divider on its card. */
+  summary: string[];
 }
