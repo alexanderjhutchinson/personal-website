@@ -61,6 +61,7 @@ export function boot() {
   const readLink = $<HTMLAnchorElement>("read-program");
   const endButton = $<HTMLAnchorElement>("end-film");
   const pickup = $("pickup");
+  const caption = $("caption");
   const viewName = document.querySelector("[data-view-name]");
   const turnButtons = document.querySelectorAll<HTMLButtonElement>("[data-turn]");
   const photoSays = document.querySelector("[data-photo-says]");
@@ -250,20 +251,31 @@ export function boot() {
   };
   renderView("Cover", true, false);
 
-  // The pick-up prompt: points at the program on the table until it's been picked up once, then only on hover.
+  // The caption, "Click around the room", is on the blank screen whenever the room is on the couch, so the
+  // room never looks like it's still loading. The pick-up prompt points at the program on the table until
+  // it's been picked up once, then only on hover.
   const updatePrompt = () => {
-    if (!pickup) return;
     const idle = !!theater && theater.mode === "idle" && !root.dataset.loading;
+    caption?.toggleAttribute("data-show", idle);
     const fresh = read(PROGRAM_KEY) !== "1";
-    pickup.hidden = !(idle && (fresh || root.dataset.hover === "program"));
+    if (pickup) pickup.hidden = !(idle && (fresh || root.dataset.hover === "program"));
     theater?.setGlint(idle && fresh);
     placePrompt();
   };
   const placePrompt = () => {
-    if (!pickup || pickup.hidden || !theater) return;
-    const at = theater.programAnchor();
-    pickup.style.visibility = at ? "" : "hidden";
-    if (at) pickup.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+    if (!theater) return;
+    if (pickup && !pickup.hidden) {
+      const at = theater.programAnchor();
+      pickup.style.visibility = at ? "" : "hidden";
+      if (at) pickup.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+    }
+    if (caption?.hasAttribute("data-show")) {
+      const at = theater.screenAnchor();
+      caption.style.visibility = at ? "" : "hidden";
+      if (!at) return;
+      caption.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+      caption.style.setProperty("--screen-width", `${Math.round(at.width)}px`);
+    }
   };
 
   // Pointer.
