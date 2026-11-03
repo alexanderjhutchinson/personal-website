@@ -526,6 +526,20 @@ export class Theater {
     if (this.state.paper > 0.01) return null;
     const p = PROGRAM.position.clone();
     p.y += PAPER.h + 0.035;
+    return this.onPage(p);
+  }
+
+  /** Where the middle of the screen is on the page, and how wide the screen is there, for the caption on it. */
+  screenAnchor() {
+    const at = this.onPage(SCREEN.center.clone());
+    const left = this.onPage(SCREEN.center.clone().setX(SCREEN.center.x - SCREEN.width / 2));
+    const right = this.onPage(SCREEN.center.clone().setX(SCREEN.center.x + SCREEN.width / 2));
+    if (!at) return null;
+    return { ...at, width: left && right ? right.x - left.x : 0 };
+  }
+
+  /** A point in the room on the page, or null when it's out of view. */
+  private onPage(p: THREE.Vector3) {
     p.project(this.camera);
     if (p.z > 1 || Math.abs(p.x) > 1 || Math.abs(p.y) > 1) return null;
     const rect = this.canvas.getBoundingClientRect();

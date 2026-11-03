@@ -277,7 +277,8 @@ Leaning toward 1 and 2 first: least new art, and the best fit for movie night. T
 
 Rules for all of them:
 
-- No markers or prompts. The cursor changes and a faint glint shows on hover. The program's pick-up prompt stays the only one.
+- No markers or prompts. The cursor changes and a faint glint shows on hover. The program's pick-up prompt stays the only one, besides the caption below.
+- A caption on the blank screen: "Click around the room." A tester sat waiting on the couch, thinking the room was still loading, since nothing said it was ready once "Threading the film…" faded. So the caption takes over the same middle of the view, printed on the screen in dark ink (multiplied into the picture, so it takes the screen's light) and sized to it, two lines on a small screen. It's there whenever the room is on the couch, first visit or not, like a slide waiting before the film, and fades whenever the view leaves the couch.
 - A hint instead of markers, for anyone stuck: after 5 seconds on the couch without finding anything new (moving the pointer doesn't count, since that's someone looking), one thing not yet tried blinks with its hover glow until it's used, in order of importance: the projector, then the pin board, then the radio. The lamps are left out, since their dimming under the pointer says enough. What's been used is remembered (`movie-night:tried`), and the next one waits another 5 seconds. Touch screens, which have no hover, get the most from it. With reduced motion it holds a steady glow.
 - Everything works with a tap; touch screens have no hover.
 - Nothing adds work while the room sits idle (see "Performance").
