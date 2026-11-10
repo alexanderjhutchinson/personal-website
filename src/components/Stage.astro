@@ -51,7 +51,9 @@ const { open } = Astro.props;
     <button class="reel-button" type="button" data-turn="-1" aria-label="Previous page"><span aria-hidden="true">◀</span></button>
     <span class="view-name" data-view-name aria-live="polite">Cover</span>
     <button class="reel-button" type="button" data-turn="1" aria-label="Next page"><span aria-hidden="true">▶</span></button>
-    <button class="reel-button" type="button" data-put-down>Put it down <kbd>Esc</kbd></button>
+    <button class="reel-button close" type="button" data-back-out aria-label="Put the program down" title="Put the program down (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
   </div>
 
   <!-- At the pin board. For the keyboard, a button for each photo, shown only while it has focus. -->
@@ -64,13 +66,17 @@ const { open } = Astro.props;
         </button>
       ))
     }
-    <button class="reel-button" type="button" data-leave-board>Back to the couch <kbd>Esc</kbd></button>
+    <button class="reel-button close" type="button" data-back-out aria-label="Back to the couch" title="Back to the couch (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
   </div>
 
   <!-- While a photo from the pin board is held up. -->
   <div class="photo-bar" role="group" aria-label="The photo in hand">
     <button class="reel-button" type="button" data-turn-photo>Turn it over</button>
-    <button class="reel-button" type="button" data-pin-back>Pin it back <kbd>Esc</kbd></button>
+    <button class="reel-button close" type="button" data-back-out aria-label="Pin the photo back" title="Pin the photo back (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
     <p class="visually-hidden" aria-live="polite" data-photo-says></p>
   </div>
 
@@ -167,6 +173,20 @@ const { open } = Astro.props;
   .resume {
     margin-left: auto;
     text-decoration: none;
+  }
+
+  /* The ×, in each bar: square, the other buttons' height. */
+  .close {
+    justify-content: center;
+  }
+
+  .stage .reel-button.close {
+    padding: 0.5em;
+  }
+
+  .close svg {
+    width: 1.6em;
+    height: 1.6em;
   }
 
   .sound .waves {
