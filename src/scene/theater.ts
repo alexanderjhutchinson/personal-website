@@ -177,6 +177,15 @@ const STILL_RATE = 30;
 const SETTLE_MS = 1500;
 /** Drawn frames sampled before deciding whether the machine keeps up. */
 const PACE_SAMPLES = 45;
+/**
+ * The most pixels the room draws, however big and sharp the screen: a 1920×1080 picture's worth. The
+ * drawing buffers take graphics memory for every pixel (several hundred megabytes on a sharp laptop
+ * screen before this cap), and every pixel is work for the graphics card on every frame. A screen
+ * is never drawn coarser than its own grid of points, so a huge plain monitor can still go over.
+ */
+const MAX_PIXELS = 1920 * 1080;
+/** A plain screen drawing more than this (bigger than 2560×1440) gets lighter anti-aliasing, to keep its buffers in hand. */
+const MANY_PIXELS = 2560 * 1440;
 
 export interface TheaterOptions {
   reducedMotion: boolean;
@@ -194,6 +203,8 @@ export interface TheaterOptions {
   onUse?: (thing: Hint) => void;
   /** Called after every rendered frame. */
   onFrame?: () => void;
+  /** The browser took the graphics away mid-visit (false), or handed them back (true). */
+  onGraphics?: (back: boolean) => void;
 }
 
 export class Theater {
@@ -260,6 +271,8 @@ export class Theater {
   private lastInput = 0;
   /** Something covers the whole room, so there's nothing to draw. */
   private held = false;
+  /** The browser has taken the graphics away for now (see watchGraphics). */
+  private lost = false;
   /** How far drawing has been cut back for a machine that can't keep up (see lowerQuality). */
   private quality = 0;
   private pace: number[] = [];
@@ -304,9 +317,7 @@ export class Theater {
       new Promise((resolve) => setTimeout(resolve, 2500)),
     ]);
 
-    const small = Math.min(window.innerWidth, window.innerHeight) < 700;
     const renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: "high-performance" });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, small ? 1.5 : 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     renderer.shadowMap.enabled = true;
@@ -375,7 +386,7 @@ export class Theater {
     this.beam = buildBeam(this.projector.lensWorld, corners);
     scene.add(this.beam.group);
 
-    this.program = buildProgram(small ? 0.6 : 1, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+    this.program = buildProgram(() => (this.smallScreen ? 0.6 : 1), Math.min(8, renderer.capabilities.getMaxAnisotropy()));
     scene.add(this.program.group);
     // Dims the room behind the program while it's held up.
     this.veil = new THREE.Mesh(
@@ -409,6 +420,8 @@ export class Theater {
     // Only the scene pass anti-aliases; the passes after it work on plain buffers.
     const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
     this.composer = new EffectComposer(renderer, target);
+    // The passes are sized in drawn pixels (see resize), so the composer isn't given a ratio of its own.
+    this.composer.setPixelRatio(1);
     this.scenePass = new ScenePass(scene, this.camera, 4);
     this.composer.addPass(this.scenePass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.55, 0.85);
@@ -421,6 +434,7 @@ export class Theater {
     window.addEventListener("resize", () => this.resize());
     this.canvas.addEventListener("pointermove", (e) => this.onPointerMove(e));
     this.canvas.addEventListener("pointerleave", () => this.setHovering(null));
+    this.watchGraphics();
 
     renderer.shadowMap.needsUpdate = true;
     this.applyState(0);
@@ -999,11 +1013,19 @@ export class Theater {
     const h = this.canvas.clientHeight || window.innerHeight;
     const before = this.views;
     this.size = { w, h };
+    const pr = this.fitPixelRatio(w, h);
+    this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
-    this.composer.setSize(w, h);
-    const pr = this.renderer.getPixelRatio();
-    this.bloom.setSize((w * pr) / 2, (h * pr) / 2);
-    this.filmPass.uniforms.uResolution.value.set(w * pr, h * pr);
+    // The passes' buffers are the size of the picture actually drawn, in whole pixels.
+    const drawn = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.composer.setSize(drawn.x, drawn.y);
+    // Anti-aliasing: 4 samples on a plain screen, where each drawn pixel shows, and 2 on a sharp one,
+    // where they're finer than that even under the pixel cap.
+    if (this.quality === 0) this.scenePass.samples = this.sharpest >= 1.5 || drawn.x * drawn.y > MANY_PIXELS ? 2 : 4;
+    // The glow keeps the size it was tuned at, the screen's own sharpness, so it's as wide however many
+    // pixels the room is drawn at.
+    this.bloom.setSize((w * this.sharpest) / 2, (h * this.sharpest) / 2);
+    this.filmPass.uniforms.uResolution.value.set(drawn.x, drawn.y);
     this.beam.setPixelRatio(pr);
     this.roomDust.setPixelRatio(pr);
     this.camera.aspect = w / h;
@@ -1019,6 +1041,45 @@ export class Theater {
       Object.assign(this.state, { open, flip, focus });
       this.showView();
     }
+  }
+
+  /**
+   * Pixels drawn per screen point: the screen's own, up to 2 (1.5 on a small screen), within the pixel
+   * budget, and no fewer than 1. A machine that can't keep up gets 1 (see lowerQuality).
+   */
+  private fitPixelRatio(w: number, h: number) {
+    if (this.quality >= 2) return 1;
+    return Math.min(this.sharpest, Math.max(1, Math.sqrt(MAX_PIXELS / (w * h))));
+  }
+
+  /** The screen's own pixels per point, up to 2 (1.5 on a small screen). */
+  private get sharpest() {
+    return Math.min(window.devicePixelRatio, this.smallScreen ? 1.5 : 2);
+  }
+
+  /** A phone, or a window about that size: it gets fewer pixels per point and smaller program pages. */
+  private get smallScreen() {
+    return Math.min(window.innerWidth, window.innerHeight) < 700;
+  }
+
+  /**
+   * The browser can take the graphics away mid-visit (its graphics process restarts, or the machine
+   * runs short of graphics memory) and hand them back a moment later. three.js uploads everything
+   * again by itself; the shadows are only drawn when asked for, so they're asked for again.
+   */
+  private watchGraphics() {
+    this.canvas.addEventListener("webglcontextlost", () => {
+      this.lost = true;
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.opts.onGraphics?.(false);
+    });
+    this.canvas.addEventListener("webglcontextrestored", () => {
+      this.lost = false;
+      this.renderer.shadowMap.needsUpdate = true;
+      this.startLoop();
+      this.opts.onGraphics?.(true);
+    });
   }
 
   /** Stop drawing while something covers the whole room, and pick up again once it's gone. */
@@ -1044,7 +1105,7 @@ export class Theater {
   }
 
   private startLoop() {
-    if (this.raf || this.held) return;
+    if (this.raf || this.held || this.lost) return;
     this.last = this.drawn = performance.now();
     this.owed = 0;
     const tick = (now: number) => {
@@ -1085,12 +1146,8 @@ export class Theater {
     this.quality++;
     if (this.quality === 1) this.scenePass.samples = 0;
     if (this.quality === 2) {
-      if (this.renderer.getPixelRatio() > 1) {
-        this.renderer.setPixelRatio(1);
-        this.resize();
-      } else {
-        this.quality++;
-      }
+      if (this.renderer.getPixelRatio() > 1) this.resize();
+      else this.quality++;
     }
     if (this.quality === 3) this.bloom.enabled = false;
   }
@@ -1237,6 +1294,8 @@ export class Theater {
     const cam = this.camera;
     const { group } = this.program;
     this.program.pose(s.open, s.flip, s.paper);
+    // Its pages are painted large only while it's off the table.
+    this.program.sharpen(s.paper > 0);
     // On the table it catches a little lamp light; held up, it's lit to read.
     const pulse = this.glint * (0.5 + 0.5 * Math.sin(this.time * 2.6)) * (1 - s.paper);
     this.program.setGlow(

@@ -1,8 +1,14 @@
 import * as THREE from "three";
-import { PAGE_H, PAGE_W, paintProgram, type RegionAction } from "./programPages";
+import { PAGE_COUNT, PAGE_H, PAGE_W, paintPage, type RegionAction } from "./programPages";
 
 /** Half-letter paper, in meters. */
 export const PAPER = { w: 0.14, h: 0.216 };
+
+/**
+ * How large the pages are painted while the program stands on the table, as a share of full size. Seen
+ * from across the room that's still more than the screen can show, at a sixteenth of the memory.
+ */
+const TABLE_SCALE = 0.25;
 
 export interface ProgramPaper {
   /** Placed in the room each frame by the theater. */
@@ -17,6 +23,12 @@ export interface ProgramPaper {
    */
   pose(open: number, flip: number, centered: number): void;
   setGlow(intensity: number): void;
+  /**
+   * Call every frame. While `want` is true, paints the pages large enough to read up close, one page a
+   * call so picking it up never stalls on all four at once. Once it's false, goes back to the small pages
+   * and lets the large ones go.
+   */
+  sharpen(want: boolean): void;
   /** What a click on this spot of a page does, if anything. */
   actionAt(hit: THREE.Intersection): RegionAction | null;
 }
@@ -26,16 +38,28 @@ export interface ProgramPaper {
  * the fold and carries the cover and the inside-left page; the right leaf
  * carries the inside-right page and the back.
  */
-export function buildProgram(textureScale: number, anisotropy: number): ProgramPaper {
-  const painted = paintProgram(textureScale);
+export function buildProgram(sharpScale: () => number, anisotropy: number): ProgramPaper {
   const { w, h } = PAPER;
 
-  const materials = painted.map(({ canvas }) => {
+  const texture = (canvas: HTMLCanvasElement) => {
     const map = new THREE.CanvasTexture(canvas);
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = anisotropy;
-    return new THREE.MeshStandardMaterial({ map, emissiveMap: map, emissive: "#ffffff", emissiveIntensity: 0.1, roughness: 0.92 });
-  });
+    return map;
+  };
+  // The small pages stay for as long as the room does. The large ones are by far the room's biggest
+  // textures, so they exist only while the program is off the table.
+  const painted = Array.from({ length: PAGE_COUNT }, (_, i) => paintPage(i, TABLE_SCALE));
+  const small = painted.map(({ canvas }) => texture(canvas));
+  const sharp: (THREE.CanvasTexture | null)[] = small.map(() => null);
+  // The large pages' share of full size, settled each time the program is picked up.
+  let scale = 1;
+  const materials = small.map(
+    (map) => new THREE.MeshStandardMaterial({ map, emissiveMap: map, emissive: "#ffffff", emissiveIntensity: 0.1, roughness: 0.92 }),
+  );
+  const show = (page: number, map: THREE.Texture) => {
+    materials[page].map = materials[page].emissiveMap = map;
+  };
 
   // Each face is a plane from the fold (x = 0) out to the edge. Back faces are turned
   // around so they face the other way, a hair apart so they never fight for depth.
@@ -75,6 +99,26 @@ export function buildProgram(textureScale: number, anisotropy: number): ProgramP
     },
     setGlow(intensity) {
       for (const m of materials) m.emissiveIntensity = intensity;
+    },
+    sharpen(want) {
+      if (want) {
+        // The cover first: it's the page facing the camera on the way up.
+        const page = sharp.indexOf(null);
+        if (page < 0) return;
+        if (page === 0) scale = sharpScale();
+        sharp[page] = texture(paintPage(page, scale).canvas);
+        show(page, sharp[page]);
+        return;
+      }
+      sharp.forEach((map, page) => {
+        if (!map) return;
+        show(page, small[page]);
+        map.dispose();
+        // Emptying the canvas gives its pixels back now, rather than whenever the browser gets to it.
+        const canvas = map.image as HTMLCanvasElement;
+        canvas.width = canvas.height = 0;
+        sharp[page] = null;
+      });
     },
     actionAt(hit) {
       const page = hit.object.userData.page as number | undefined;

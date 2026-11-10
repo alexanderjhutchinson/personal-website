@@ -1,6 +1,7 @@
 ---
 import "@fontsource/pixelify-sans/500.css";
 import { REELS, reelItems, type ReelId } from "../data";
+import { resume } from "../data/profile";
 
 // The reels around the room's screen. The game itself, with its hotbar and item
 // panel, is drawn into a picture that plays on the screen in 3D; this is what
@@ -66,7 +67,7 @@ const cards = REELS.flatMap((r) => reelItems[r.id].map((item) => ({ key: `${r.id
   </button>
 
   <noscript>
-    <p class="noscript">The reels need JavaScript. Everything on them is also in <a href="/program">the program</a>.</p>
+    <p class="noscript">The reels need JavaScript. What's on them is also in <a href={resume}>my resume</a>.</p>
   </noscript>
 
   <aside class="tuning" id="tuning" aria-label="Tuning" hidden></aside>

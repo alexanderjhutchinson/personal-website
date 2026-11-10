@@ -17,6 +17,8 @@ const TRIED_KEY = "movie-night:tried";
 
 /** How long the room waits on the couch, with nothing new found, before the hint starts. */
 const HINT_DELAY_MS = 5000;
+/** How long to wait for graphics that dropped out mid-visit before saying the room can't open. */
+const GRAPHICS_WAIT_MS = 5000;
 /** What the hint points out, first to last: it blinks the first of these not yet tried. */
 const HINTS: Hint[] = ["projector", "board", "radio"];
 
@@ -36,7 +38,7 @@ function write(key: string, value: string) {
   }
 }
 
-/** "flat" is the page without the 3D room: the program on its own, or a reel on its own. */
+/** "flat" is the page without the 3D room: a note saying why, with the resume, or a reel on its own. */
 type PageMode = "room" | "program" | "board" | "photo" | "playing" | "entering" | "reel" | "ending" | "flat";
 
 const pageMode: Record<Mode, PageMode> = {
@@ -80,6 +82,7 @@ export function boot() {
 
   let theater: Theater | null = null;
   let loading: Promise<Theater | null> | null = null;
+  let graphicsTimer = 0;
   /** The reel the film opens on, and whether going in adds it to the browser history. */
   let feature: Reel = REELS[0];
   let pushFeature = true;
@@ -111,10 +114,21 @@ export function boot() {
     lobby?.setSound(soundOn);
   });
 
+  /** Whether this browser gives a page 3D graphics at all. It doesn't with graphics acceleration off. */
+  const has3D = () => {
+    try {
+      return !!document.createElement("canvas").getContext("webgl2");
+    } catch {
+      return false;
+    }
+  };
+
+  // The room couldn't start: the page becomes a note saying why, with the resume (on a reel's address,
+  // the reel on its own). The note has a line for each reason.
   const fallBack = (err: unknown) => {
     console.warn("The 3D room couldn't start, showing the page without it.", err);
     setPageMode("flat");
-    root.dataset.scene = "unavailable";
+    root.dataset.scene = has3D() ? "failed" : "no-graphics";
     if (openedOn && reelScreen) lobby?.mount(reelScreen);
   };
 
@@ -143,6 +157,23 @@ export function boot() {
           },
           onUse: (thing) => use(thing),
           onFrame: () => placePrompt(),
+          // Graphics dropped out mid-visit: "Threading the film…" while the browser brings them back.
+          // If it hasn't in a few seconds, the note; and if they come back after that, the room again.
+          onGraphics: (back) => {
+            window.clearTimeout(graphicsTimer);
+            if (back) {
+              delete root.dataset.loading;
+              delete root.dataset.scene;
+              if (root.dataset.mode === "flat") setPageMode(pageMode[t.mode]);
+            } else {
+              root.dataset.loading = "true";
+              graphicsTimer = window.setTimeout(
+                () => fallBack(new Error("The graphics dropped out and didn't come back.")),
+                GRAPHICS_WAIT_MS,
+              );
+            }
+            updatePrompt();
+          },
         });
         await t.init();
         if (import.meta.env.DEV) (window as unknown as { theater: Theater }).theater = t;
@@ -376,24 +407,10 @@ export function boot() {
     endFeature();
   });
 
-  // While the plain program or the "too narrow" note covers the room, the room stops drawing.
+  // While the "too narrow" note covers the room, the room stops drawing.
   const narrow = window.matchMedia("(max-aspect-ratio: 6/5)");
-  const coverRoom = () => theater?.hold(root.hasAttribute("data-plain") || narrow.matches);
+  const coverRoom = () => theater?.hold(narrow.matches);
   narrow.addEventListener("change", coverRoom);
-
-  // On a screen too narrow for the room, the program as a plain page.
-  const setPlain = (on: boolean) => {
-    if (on) root.dataset.plain = "";
-    else delete root.dataset.plain;
-    coverRoom();
-  };
-  document.querySelectorAll("[data-plain]").forEach((b) =>
-    b.addEventListener("click", () => {
-      setPlain(true);
-      $("program-view")?.scrollTo(0, 0);
-    }),
-  );
-  document.querySelectorAll("[data-plain-close]").forEach((b) => b.addEventListener("click", () => setPlain(false)));
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
   document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
@@ -404,17 +421,15 @@ export function boot() {
   // Keyboard. While a reel plays, the keys are the game's.
   /**
    * Escape always backs out of whatever is on top, one layer at a time: an item card (which closes
-   * itself), the plain program, the tuning panel, then the film (back to the couch), the opening
-   * (stopped), the program in hand (put down), the photo in hand (pinned back), or the pin board (back
-   * to the couch).
+   * itself), the tuning panel, then the film (back to the couch), the opening (stopped), the program in
+   * hand (put down), the photo in hand (pinned back), or the pin board (back to the couch).
    */
   const escape = () => {
     if (document.querySelector("dialog[open]")) return;
     const tuning = $("tuning");
-    if (root.hasAttribute("data-plain")) setPlain(false);
-    else if (tuning && !tuning.hidden) tuning.hidden = true;
+    if (tuning && !tuning.hidden) tuning.hidden = true;
     else if (!theater) {
-      // Without the room, a reel's address is its own page: back out to the program.
+      // Without the room, a reel's address is its own page: back out to the front page.
       if (openedOn && root.dataset.mode === "flat") location.assign("/");
     } else if (theater.mode === "reel" || theater.mode === "entering") endFeature();
     else if (theater.mode === "playing") theater.abort();

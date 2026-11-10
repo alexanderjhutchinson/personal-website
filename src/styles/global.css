@@ -129,7 +129,7 @@ button {
   flex: none;
 }
 
-/* Page modes, set on <html data-mode>. Without JavaScript there is no mode and the resume shows on its own. */
+/* Page modes, set on <html data-mode>. Without JavaScript there is no mode, and a note with the resume shows instead. */
 html[data-mode="room"],
 html[data-mode="board"],
 html[data-mode="photo"],
