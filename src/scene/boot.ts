@@ -413,10 +413,9 @@ export function boot() {
   narrow.addEventListener("change", coverRoom);
 
   turnButtons.forEach((b) => b.addEventListener("click", () => theater?.turn(Number(b.dataset.turn) < 0 ? -1 : 1)));
-  document.querySelectorAll("[data-put-down]").forEach((b) => b.addEventListener("click", putDown));
   turnPhotoButton?.addEventListener("click", () => theater?.turnPhoto());
-  document.querySelectorAll("[data-pin-back]").forEach((b) => b.addEventListener("click", () => void pinBack()));
-  document.querySelectorAll("[data-leave-board]").forEach((b) => b.addEventListener("click", () => void theater?.leaveBoard()));
+  // The × in each bar backs out one layer, the same as Escape.
+  document.querySelectorAll("[data-back-out]").forEach((b) => b.addEventListener("click", () => escape()));
 
   // Keyboard. While a reel plays, the keys are the game's.
   /**
