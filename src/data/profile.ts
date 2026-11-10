@@ -33,3 +33,6 @@ export const links: Link[] = [
   { label: "LinkedIn", href: "https://www.linkedin.com/in/alexanderjhutchinson/", display: "in/alexanderjhutchinson" },
   { label: "GitHub", href: "https://github.com/alexanderjhutchinson", display: "alexanderjhutchinson" },
 ];
+
+/** The resume as a PDF, in `public/`. The Resume button opens it, and so do the notes shown when the room can't. */
+export const resume = "/alexander-hutchinson-resume.pdf";

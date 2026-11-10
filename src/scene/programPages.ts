@@ -4,8 +4,8 @@ import { rng } from "./random";
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from "./textures";
 
 // Paints the program's four pages (cover, inside left, inside right, back) on
-// canvases for the paper on the coffee table. Drawn large enough to read when
-// the paper is held up to the camera.
+// canvases for the paper on the coffee table. Painted small for the table, and
+// large enough to read once the paper is held up to the camera.
 
 /** Page size in canvas units. The paper is half-letter, so the same 0.647 ratio. */
 export const PAGE_W = 1100;
@@ -238,15 +238,14 @@ function paintCover(scale: number): PaintedPage {
   return { canvas: c, regions };
 }
 
-/** All four pages, in order: cover, inside left, inside right, back. */
-export function paintProgram(scale: number): PaintedPage[] {
-  return [
-    paintCover(scale),
-    ...pages.map((sections, i) => {
-      const { c, ctx } = blank(scale, 23 + i * 7);
-      const regions: Region[] = [];
-      paintSections(ctx, sections, regions);
-      return { canvas: c, regions };
-    }),
-  ];
+/** How many pages the program has: the cover, then the pages inside and on the back. */
+export const PAGE_COUNT = 1 + pages.length;
+
+/** One page, by its place in the program: cover, inside left, inside right, back. */
+export function paintPage(index: number, scale: number): PaintedPage {
+  if (index === 0) return paintCover(scale);
+  const { c, ctx } = blank(scale, 23 + (index - 1) * 7);
+  const regions: Region[] = [];
+  paintSections(ctx, pages[index - 1], regions);
+  return { canvas: c, regions };
 }

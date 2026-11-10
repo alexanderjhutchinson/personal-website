@@ -1,6 +1,7 @@
 ---
 import "@fontsource/indie-flower/400.css";
 import { PHOTOS } from "../data/photos";
+import { resume } from "../data/profile";
 
 interface Props {
   /** Open with the program already picked up. */
@@ -21,6 +22,8 @@ const { open } = Astro.props;
   <div class="top-bar">
     <a id="read-program" class="skip keys-only" href="/program">Read the program</a>
     <button id="look-photos" class="skip keys-only look" type="button">Look at the photos on the pin board</button>
+    <!-- The quick way to the resume, for anyone who came only for that: the PDF, in a tab of its own so the room stays. -->
+    <a class="reel-button resume" href={resume} target="_blank" rel="noopener">Resume</a>
     <button id="sound-toggle" class="reel-button sound" type="button" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-linejoin="round"></path>
@@ -160,8 +163,10 @@ const { open } = Astro.props;
     white-space: nowrap;
   }
 
-  .sound {
+  /* Resume and sound sit together in the top-right corner. */
+  .resume {
     margin-left: auto;
+    text-decoration: none;
   }
 
   .sound .waves {

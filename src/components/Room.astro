@@ -1,6 +1,6 @@
 ---
 import type { ReelId } from "../data";
-import ProgramView from "./ProgramView.astro";
+import { resume } from "../data/profile";
 import Reel from "./Reel.astro";
 import Stage from "./Stage.astro";
 
@@ -20,16 +20,31 @@ const { open, reel } = Astro.props;
 
 <Stage open={open} />
 <Reel reel={reel} />
-<ProgramView reelPage={!!reel} />
 
-<!-- The room is made for a wide screen. Narrower ones get this, with the program as a way in. -->
-<div class="widen" role="dialog" aria-modal="true" aria-labelledby="widen-title">
+<!-- The room is made for a wide screen. Narrower ones get this, with the resume as a way in. -->
+<div class="notice widen" role="dialog" aria-modal="true" aria-labelledby="widen-title">
   <p class="label">Home movie night</p>
-  <p class="widen-title" id="widen-title">
+  <p class="notice-title" id="widen-title">
     <span class="coarse">Turn your phone sideways</span><span class="fine">Widen your window</span>
   </p>
-  <p class="widen-note">The living room and its feature need a wide screen.</p>
-  <button class="reel-button" type="button" data-plain>Read the program instead</button>
+  <p class="notice-note">The living room and its feature need a wide screen.</p>
+  <a class="reel-button" href={resume} target="_blank" rel="noopener">Open my resume instead</a>
+</div>
+
+<!--
+  When the room can't start, this is the page: what's wrong, how to get the room back, and the resume.
+  A reel's address plays the reel on its own instead (see Reel.astro).
+-->
+<div class="notice closed" data-reel-page={reel ? "" : undefined}>
+  <p class="label">Home movie night</p>
+  <h1 class="notice-title">The room can't open here</h1>
+  <p class="notice-note" data-why="graphics">
+    The room is drawn in 3D, and this browser has 3D graphics switched off. Quitting and reopening the browser often
+    brings it back. If not, turn on graphics acceleration in its settings.
+  </p>
+  <p class="notice-note" data-why="failed">Something went wrong while it was loading. Reloading the page may bring it back.</p>
+  <noscript><p class="notice-note">The room needs JavaScript, which is switched off in this browser.</p></noscript>
+  <a class="reel-button primary" href={resume} target="_blank" rel="noopener">Open my resume</a>
 </div>
 
 <script>
@@ -38,23 +53,36 @@ const { open, reel } = Astro.props;
 </script>
 
 <style>
-  .widen {
+  .notice {
     display: none;
+    place-content: center;
+    justify-items: center;
+    gap: 0.9rem;
+    padding: 24px;
+    text-align: center;
+    background: var(--night);
   }
 
+  /* Too narrow for the room: over it, until the window is widened. */
   @media (max-aspect-ratio: 6/5) {
-    :global(html[data-mode]:not([data-mode="flat"]):not([data-plain])) .widen {
+    :global(html[data-mode]:not([data-mode="flat"])) .widen {
       position: fixed;
       inset: 0;
       z-index: 40;
       display: grid;
-      place-content: center;
-      justify-items: center;
-      gap: 0.9rem;
-      padding: 24px;
-      text-align: center;
-      background: var(--night);
     }
+  }
+
+  /* No room: the note is the page. Without JavaScript there's no mode at all, so it shows unless a mode hides it. */
+  .closed {
+    display: grid;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  :global(html[data-mode]:not([data-mode="flat"])) .closed,
+  .closed[data-reel-page] {
+    display: none;
   }
 
   .label {
@@ -62,7 +90,7 @@ const { open, reel } = Astro.props;
     color: var(--amber);
   }
 
-  .widen-title {
+  .notice-title {
     margin: 0;
     font-family: var(--font-display);
     font-variation-settings: "SOFT" 100;
@@ -71,9 +99,25 @@ const { open, reel } = Astro.props;
     line-height: 1.1;
   }
 
-  .widen-note {
+  .notice-note {
+    max-width: 34rem;
     margin: 0 0 0.6rem;
     color: var(--ink-dim);
+    text-wrap: pretty;
+  }
+
+  /* Which reason shows: graphics switched off, or anything else that stopped the room loading. */
+  .notice-note[data-why] {
+    display: none;
+  }
+
+  :global(html[data-mode="flat"]:not([data-scene="failed"])) .notice-note[data-why="graphics"],
+  :global(html[data-scene="failed"]) .notice-note[data-why="failed"] {
+    display: block;
+  }
+
+  .notice .reel-button {
+    text-decoration: none;
   }
 
   .coarse {

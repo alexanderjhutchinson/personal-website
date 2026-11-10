@@ -161,10 +161,10 @@ The critique after #3: the landing page and the feature still didn't feel like o
 - **The room's own controls sit in the margins**, never on the screen: sound and the × top right, and the door buttons in the window's bottom corners (next reel bottom right), in the room's amber and cream.
 - **Item cards** pop up over everything as a page of the program: its cream paper with a little grain, the double rule with a diamond at each corner, the dates in small rust mono over a Fraunces name, and the cover's diamond divider. No pixel icon: that stays on the screen's panel. A job's card leads with the company, linked to its site, with the title on the line under it and the location under that, and a few sentences on what I did under the divider, one to a paragraph and aligned left so they're easy to read. A project's card is the same, its name linked to its code, with its technologies under the sentences. They rise into view the way the program is raised and sink back out the same way when closed (by the bar's button, Escape, or a click outside), the room dims behind them (not to black), and "Back to the film" sits in a bar under the paper, like the bars under the program and the photos. The reel's items also exist as a hidden list for screen readers and keyboards.
 - **One page.** `/`, `/program` and each reel's address are the same page in different states. Going into the film adds the reel's address to the history; the × and the back button play the ending (the reel holds a beat, the film runs out, the camera pulls back) with no page load. A reel's address opens with that reel already on the screen.
-- **Wide screens only.** Anything narrower than 6:5 (an upright phone, a narrow window) gets a note in the room's style: "Turn your phone sideways" or "Widen your window", with "Read the program instead" opening the plain program.
+- **Wide screens only.** Anything narrower than 6:5 (an upright phone, a narrow window) gets a note in the room's style: "Turn your phone sideways" or "Widen your window", with "Open my resume instead" opening the resume PDF.
 - Item name colors are warmed to the room's palette: burnt orange for school, amber for work, avocado for projects. The in-game hotbar slots are warm brown.
-- **Escape** always backs out of the top layer, one at a time: an item card, the plain program, the tuning panel, then the film (back to the couch). During the opening it stops the film and brings the lights back up; with the program in hand it puts it down.
-- Sound is shared between the room and the reels. Without WebGL, `/` and `/program` show the program on its own and a reel's address shows the reel's picture on its own.
+- **Escape** always backs out of the top layer, one at a time: an item card, the tuning panel, then the film (back to the couch). During the opening it stops the film and brings the lights back up; with the program in hand it puts it down.
+- Sound is shared between the room and the reels. When the room can't start, `/` and `/program` show a note with the resume and a reel's address shows the reel's picture on its own (see "The resume button").
 
 Checked in Chromium at 16:9, an upright phone, and a phone held sideways: from the couch into Reel 1, a reel's address directly, clicking an item on the screen (opens its card), choosing a hotbar slot and mining a block through the screen, the ×, the "too narrow" note and the plain program. The page's script is 22 KB gzipped; three.js still loads after it. Not tested: Safari, Firefox, real phones, and a browser without WebGL.
 
@@ -184,7 +184,7 @@ Where the time went, per frame: 4× anti-aliasing about 5 ms (every post-process
 
 - **Only the scene is anti-aliased.** It draws into a multisampled buffer of its own (`src/scene/scenePass.ts`), and bloom, color and film work on a plain copy. Same look; a frame went from 8.1 ms to 4.8 ms.
 - **The frame rate follows what's on screen:** 60 frames a second while anything moves (a sequence, the program being picked up or turned, the pointer moving, a reel playing), 30 while the room sits still on the couch or with the program held still. However fast the screen refreshes.
-- **Nothing is drawn while the room is covered**: by the plain program, or by the "too narrow" note.
+- **Nothing is drawn while the room is covered** by the "too narrow" note.
 - **Slow machines step down on their own.** If frames keep coming in well behind (the median over 45 frames is more than 1.4 times late), the room drops anti-aliasing, then draws at one pixel per screen pixel, then drops bloom, about 2 seconds apart. The dust's point size now follows the room's actual drawing resolution.
 
 After, on the same Mac: the GPU is about 31 to 41% busy on the couch (was 95 to 100%) and 40 to 48% during a reel (was about 100%), and both numbers include the 0 to 17% the rest of the desktop uses. Reels hold a steady 60 frames a second. Checked: the opening, picking up and turning the program, a reel, the "too narrow" note and the plain program (drawing stops and resumes), and a simulated slow machine (each step down, and the lowest step still renders correctly). The fast machine was never stepped down.
@@ -193,6 +193,27 @@ Open:
 
 - Not measured on an actual slow laptop or phone; the step-down was tested by slowing frames on purpose.
 - The reels' game still draws its picture on every screen refresh (about 1 ms of CPU each), though the room only shows it 60 times a second.
+
+### Lighter on the graphics card (built, not merged yet)
+
+The question this time: can the room knock out a visitor's graphics? A tester's Chrome had 3D switched off on a laptop where the room had run earlier (see "The resume button"). That isn't proven to be the room's doing, but the room asked for a lot. At a 13-inch laptop's window (1440×820 at 2 pixels per point) the drawing buffers came to about 370 MB by my estimate, 250 MB of it the anti-aliased scene buffer, with about 110 MB of textures and shadow maps on top. A 5K screen would have asked for over a gigabyte.
+
+- **A cap on drawn pixels:** never more than about a 1920×1080 picture (2.1 megapixels), whatever the screen. That laptop window draws 1908×1086 instead of 2880×1640. A plain screen (1 pixel per point) is never drawn coarser than its own grid.
+- **Lighter anti-aliasing on sharp screens:** 2 samples where pixels are packed 1.5 to a point or finer, 4 on plain screens, where each pixel shows. A plain screen bigger than 2560×1440 also gets 2. At the 1080p cap, 2 and 4 samples looked the same side by side.
+- **Together:** about 110 MB of buffers on that window instead of 370. Compared side by side at full zoom, the program's text in hand is softer than it was and still easy to read, and the room looks the same.
+- **The glow keeps its size.** Bloom is sized from the screen, not from the pixels drawn, so the lamps glow as wide at any drawing size. Sized from the drawn pixels, the glow got wider as the picture got smaller.
+- **The step down for slow machines now shrinks the buffers.** The "one pixel per point" step used to resize only the canvas: the passes kept a pixel ratio of their own from when they were made, so the scene was still drawn at full size. Now the steps go from about 110 MB to 47 MB (no anti-aliasing) to 27 MB (one pixel per point) on that window.
+- **The program's pages are painted small until it's picked up.** Its four pages were the room's biggest textures: 1100×1700 each, about 38 MB of about 90 MB, plus about 28 MB for the canvases they're painted on, all kept for the whole visit so the program could be read in hand. Now the pages on the table are 275×425 (about 2.4 MB for all four), which is still three times what the screen shows of them from the couch. The full-size pages are painted when the program leaves the table, one page a frame with the cover first, and let go when it's back down. A phone gets its 0.6-size pages the same way, and the size is settled at pickup rather than when the page loads.
+- **Graphics that drop out mid-visit come back.** When the browser takes the graphics away (its graphics process restarts, or the machine runs short of graphics memory), the room used to come back nearly black, with a stream of graphics errors, until the page was reloaded: the shadows are only drawn when asked for, and nothing asked again. Now drawing stops, "Threading the film…" shows, and when the graphics return the shadows are redrawn and the room carries on. If they aren't back in 5 seconds the can't-start note shows, and the room returns if they come back after that.
+
+Checked in Chrome on the M4 Pro: the buffer sizes at a laptop window, a plain screen and a phone held sideways; each step down (sizes, and the picture stays as bright); the same glow at every drawing size; a simulated drop and return (the picture matches the one before it), a drop that doesn't return (the note, then the room again once it does); the program, a reel and the ending. For the program's pages: small on the table and full size in hand, at a laptop window and a phone held sideways; no frame over 25 ms during pickup, with all four pages in within 60 ms; every page and the cover's reel links in hand; small again with the large canvases emptied after putting it down; `/program` opening with it in hand; a drop and return while it's held; and a side-by-side of the table at 4× zoom, where the two look the same.
+
+Open:
+
+- Not run on a real slow laptop, and the GPU's busy time wasn't measured again.
+- A slow machine still starts at the full budget and steps down after a second or two. Starting lighter on weak graphics would skip those seconds, but needs a slow laptop to tune.
+- After a drop and return, the console shows "object does not belong to this context" warnings whenever three.js lets go of something made before the drop (a resized buffer, the program's large pages). It's three.js deleting handles that went with the old graphics context. Nothing leaks and the picture is right.
+- The room still draws 30 frames a second while its window is visible but not in use.
 
 ## Room extras: the rest of the room
 
@@ -278,6 +299,7 @@ Leaning toward 1 and 2 first: least new art, and the best fit for movie night. T
 Rules for all of them:
 
 - No markers or prompts. The cursor changes and a faint glint shows on hover. The program's pick-up prompt stays the only one, besides the caption below.
+- One button besides sound: "Resume", top right, opening the resume PDF in a tab of its own (see "The resume button").
 - A caption on the blank screen: "Click around the room." A tester sat waiting on the couch, thinking the room was still loading, since nothing said it was ready once "Threading the film…" faded. So the caption takes over the same middle of the view, printed on the screen in dark ink (multiplied into the picture, so it takes the screen's light) and sized to it, two lines on a small screen. It's there whenever the room is on the couch, first visit or not, like a slide waiting before the film, and fades whenever the view leaves the couch.
 - A hint instead of markers, for anyone stuck: after 5 seconds on the couch without finding anything new (moving the pointer doesn't count, since that's someone looking), one thing not yet tried blinks with its hover glow until it's used, in order of importance: the projector, then the pin board, then the radio. The lamps are left out, since their dimming under the pointer says enough. What's been used is remembered (`movie-night:tried`), and the next one waits another 5 seconds. Touch screens, which have no hover, get the most from it. With reduced motion it holds a steady glow.
 - Everything works with a tap; touch screens have no hover.
@@ -448,6 +470,18 @@ Hosting: Cloudflare Workers, serving the build as static files (see the README's
 - [x] Decide whether the new site keeps the `ahutchin.github.io` address or moves to a custom domain: it moved to alexanderjhutchinson.com.
 
 ---
+
+## The resume button
+
+The site used to have a second way to show the resume: the program as a plain HTML page, shown when the room couldn't start and behind "Read the program instead" on a narrow window. It's gone. The room is the site, and the resume outside it is one thing: the PDF.
+
+- **Why:** a tester's laptop showed the plain program with no room and no explanation, and it looked like the site was broken. Chrome on that laptop had 3D graphics switched off (graphics acceleration off in its settings, or switched off by Chrome itself after its graphics process crashed, which lasts until Chrome is quit). Chrome no longer falls back to drawing 3D in software, so the room can't start there, and a page can't switch it back on. Loading the live site in Chrome with graphics acceleration off shows the same screen. What was done about the room's own load is under "Performance".
+- **The button:** "Resume" in the top-right corner beside the sound button, for anyone who came only for that. It opens `public/alexander-hutchinson-resume.pdf` in a tab of its own, so the room stays. To update the resume, replace that file. It has no phone number.
+- **When the room can't start:** the page is a note in the room's style, "The room can't open here", saying why and how to get the room back (quit and reopen the browser, or turn on graphics acceleration), with "Open my resume" under it. It has a line for each reason: 3D graphics switched off, anything else that stopped the room loading (reload), and no JavaScript. A reel's address still plays the reel on its own.
+- **Narrow windows:** the "too narrow" note's button is now "Open my resume instead".
+- The program on the coffee table stays as it was, and `/program` still opens the room with it in hand.
+
+Checked in Chrome: the button on the couch at 1280×800 and on a phone held sideways, the "too narrow" note, and the can't-start note on `/` and `/program` with graphics acceleration off (a reel's address plays the reel on its own). Not checked in a browser with JavaScript off, only that its line is the one that would show.
 
 ## Appendix: current content (June 2026 resume)
 

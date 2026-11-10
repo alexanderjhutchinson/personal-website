@@ -3,7 +3,7 @@ import { education, links, person, skills } from "./profile";
 import type { Link } from "./types";
 
 // The program: a folded paper on the coffee table. The 3D paper (src/scene/programPages.ts)
-// and its high-def view (src/components/Program.astro) are both built from this.
+// is built from this.
 
 export interface ProgramEntry {
   /** Small line above the title: dates, or a group name. */
